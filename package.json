@@ -1,0 +1,47 @@
+{
+  "name": "vue-llm-stream",
+  "version": "0.1.0",
+  "description": "Streaming LLM responses for Vue 3 — SSE parsing, resilient retries, and token-by-token markdown rendering with live syntax highlighting.",
+  "type": "module",
+  "license": "MIT",
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./providers": { "types": "./dist/providers.d.ts", "import": "./dist/providers.js" },
+    "./markdown": { "types": "./dist/markdown.d.ts", "import": "./dist/markdown.js" }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist",
+    "check:package": "publint && attw --pack ."
+  },
+  "keywords": ["vue", "llm", "streaming", "sse", "markdown", "anthropic", "openai", "llama.cpp"],
+  "peerDependencies": {
+    "vue": "^3.4.0",
+    "markdown-it": "^14.0.0",
+    "shiki": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "markdown-it": { "optional": true },
+    "shiki": { "optional": true }
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.15.0",
+    "@types/markdown-it": "^14.0.0",
+    "@vue/test-utils": "^2.4.0",
+    "happy-dom": "^15.0.0",
+    "markdown-it": "^14.0.0",
+    "publint": "^0.2.0",
+    "shiki": "^1.22.0",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
+    "vue": "^3.4.0",
+    "vue-tsc": "^2.1.0",
+    "@vitejs/plugin-vue": "^5.1.0"
+  }
+}
