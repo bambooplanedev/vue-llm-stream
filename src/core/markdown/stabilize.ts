@@ -5,6 +5,7 @@ export interface StabilizedMarkdown {
 
 const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
 const PARTIAL_FENCE_RE = /^ {0,3}`{1,2}$/
+const TABLE_DELIM_RE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/
 
 interface FenceState {
   char: string
@@ -80,6 +81,8 @@ export function stabilizeMarkdown(input: string): StabilizedMarkdown {
   const lines = input.split('\n')
   let open: FenceState | null = null
   let inline = freshInline()
+  let inTable = false
+  let prevLineHadPipe = false
 
   for (const rawLine of lines) {
     const line = stripContainers(rawLine.replace(/\r$/, ''))
@@ -89,13 +92,19 @@ export function stabilizeMarkdown(input: string): StabilizedMarkdown {
       if (!open) open = { char: marks[0]!, len: marks.length }
       else if (marks[0] === open.char && marks.length >= open.len && m[2]!.trim() === '') open = null
       inline = freshInline() // fence line = paragraph boundary
+      inTable = false
+      prevLineHadPipe = false
       continue
     }
     if (open) continue // no inline scanning inside code
     if (line.trim() === '') {
       inline = freshInline() // blank line = paragraph boundary
+      inTable = false
+      prevLineHadPipe = false
       continue
     }
+    if (!inTable && prevLineHadPipe && TABLE_DELIM_RE.test(line)) inTable = true
+    prevLineHadPipe = line.includes('|')
     scanInlineLine(line, inline)
   }
 
@@ -112,6 +121,16 @@ export function stabilizeMarkdown(input: string): StabilizedMarkdown {
   if (open) {
     text += (text.endsWith('\n') ? '' : '\n') + open.char.repeat(open.len)
     return { text, autoClosedFence: true }
+  }
+
+  // drop a trailing mid-cell table row (has `|` but doesn't end with one)
+  if (inTable && !input.endsWith('\n')) {
+    const last = (lines[lines.length - 1] ?? '').replace(/\r$/, '')
+    const trimmed = last.trimEnd()
+    if (trimmed.includes('|') && !trimmed.endsWith('|')) {
+      text = lines.slice(0, -1).join('\n').replace(/\n+$/, '')
+      return { text, autoClosedFence: false }
+    }
   }
 
   const closers = inlineClosers(inline)
