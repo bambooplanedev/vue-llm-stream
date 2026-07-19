@@ -1,5 +1,7 @@
 export { useLlmStream } from './composables/useLlmStream'
 export type { LlmStreamStatus, PerCallOptions, UseLlmStreamOptions } from './composables/useLlmStream'
+export { useScrollAnchor } from './composables/useScrollAnchor'
+export type { ScrollAnchorOptions } from './composables/useScrollAnchor'
 export type {
   ChatMessage, FinishReason, LlmProvider, LlmStreamError, SseFrame, StreamEvent, Usage,
 } from './core/events'
