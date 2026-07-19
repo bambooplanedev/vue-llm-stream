@@ -161,6 +161,39 @@
   padding: 0;
 }
 
+/* dual-theme Shiki output (highlight `themes: { light, dark }`) — token
+   colors arrive as --shiki-light/--shiki-dark variables on pre.shiki-themes;
+   the scheme is picked exactly like the --vls-* variables above */
+.vls-stream-markdown pre.shiki-themes,
+.vls-stream-markdown pre.shiki-themes span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  .vls-stream-markdown pre.shiki-themes,
+  .vls-stream-markdown pre.shiki-themes span {
+    color: var(--shiki-dark);
+    background-color: var(--shiki-dark-bg);
+  }
+}
+
+.vls-light .vls-stream-markdown pre.shiki-themes,
+.vls-stream-markdown.vls-light pre.shiki-themes,
+.vls-light .vls-stream-markdown pre.shiki-themes span,
+.vls-stream-markdown.vls-light pre.shiki-themes span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+.vls-dark .vls-stream-markdown pre.shiki-themes,
+.vls-stream-markdown.vls-dark pre.shiki-themes,
+.vls-dark .vls-stream-markdown pre.shiki-themes span,
+.vls-stream-markdown.vls-dark pre.shiki-themes span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
 /* tables */
 .vls-stream-markdown table {
   border-collapse: collapse;

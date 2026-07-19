@@ -25,7 +25,7 @@ Piping an SSE response straight into innerHTML and re-parsing the whole thing on
 - Spec-compliant incremental SSE parser — handles frames split across chunk boundaries.
 - Truncation detection: a connection that closes without a terminal event is surfaced as `{ kind: 'incomplete' }`, not a finished answer.
 - Markdown stabilization while streaming — auto-closes dangling code fences, balances emphasis (`*`/`_`/`` ` ``), and drops mid-cell table rows so the DOM never flashes broken markup.
-- Shiki highlighting inside still-open code blocks, lazy-loaded on first render and memoized per closed block.
+- Shiki highlighting inside still-open code blocks — loaded on demand only when highlighting is enabled, memoized per closed block, with light/dark dual themes that follow the color scheme.
 - Abort support plus pre-first-token auto-retry with exponential backoff and `Retry-After` handling.
 - `useScrollAnchor` — pins a chat log to the bottom while it grows, releases on user scroll.
 - Fully typed, ESM-only, zero runtime dependencies in the core.
@@ -148,7 +148,7 @@ Any provider is a plain object matching `LlmProvider`:
 
 ```ts
 interface LlmProvider {
-  buildRequest(ctx: { messages: ChatMessage[] }): { body: unknown; headers: Record<string, string> }
+  buildRequest(ctx: { messages: ChatMessage[] }): { body: Record<string, unknown>; headers: Record<string, string> }
   createEventParser(): (frame: SseFrame) => StreamEvent[]
   /** Optional fetch override — used by the mock provider to avoid the network. */
   fetch?: typeof globalThis.fetch
@@ -168,7 +168,7 @@ interface LlmProvider {
 | `headers?` | `MaybeRefOrGetter<Record<string, string> \| undefined>` | Merged over the provider's headers. |
 | `body?` | `MaybeRefOrGetter<Record<string, unknown> \| undefined>` | Merged over the provider's body. |
 | `fetch?` | `typeof globalThis.fetch` | Override for testing or custom transports. |
-| `retry?` | `RetryOptions \| false` | `{ attempts?: number; baseDelayMs?: number }`, default `{ attempts: 2, baseDelayMs: 500 }`. `false` disables retries. |
+| `retry?` | `RetryOptions \| false` | `{ retries?: number; baseDelayMs?: number }`, default `{ retries: 2, baseDelayMs: 500 }`. `retries` counts retries *after* the initial request. `false` disables retries. |
 | `abortOnUnmount?` | `boolean` | Default `true` — aborts the in-flight request when the component scope is disposed. |
 | `onDelta?` | `(text: string) => void` | Called per text delta. |
 | `onDone?` | `(text: string) => void` | Called once, with the final text. |
@@ -188,13 +188,15 @@ interface LlmProvider {
 | `abort` | `() => void` | Aborts the current call. |
 | `regenerate` | `() => Promise<string \| undefined>` | Re-runs `start` with the last input and last per-call options. |
 
+The full return shape is exported as `UseLlmStreamReturn` — useful for props, provide/inject, or store fields that hold a stream.
+
 ### `<StreamMarkdown>`
 
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `text` | `string` | — | Raw markdown, typically `stream.text.value`. |
 | `status?` | `LlmStreamStatus` | `'idle'` | Drives the `#loading`/`#error` slots and forces a flush on `'done'`/`'error'`. |
-| `highlight?` | `Omit<ShikiHighlightOptions, 'onReady'> \| false` | `{}` | `{ theme?: string; langs?: string[] }`. `false` disables Shiki (plain `<pre><code>`). |
+| `highlight?` | `Omit<ShikiHighlightOptions, 'onReady'> \| false` | `{}` | `{ theme?: string; themes?: { light: string; dark: string }; langs?: string[] }`. Defaults to the `github-light`/`github-dark` pair following the color scheme; the dual-theme colors are activated by `vue-llm-stream/theme.css` (or your own CSS reading `--shiki-light`/`--shiki-dark` on `pre.shiki-themes`) — without such CSS, code renders uncolored; `theme` pins a single fixed theme. Reactive — changes rebuild the highlighter. (replace the object, don't mutate it) `false` disables Shiki (plain `<pre><code>`). |
 
 | Slot | Rendered when |
 | --- | --- |
@@ -256,7 +258,7 @@ Every visual decision is a CSS custom property, so a custom theme is a styleshee
 | `--vls-font` / `--vls-mono` / `--vls-font-size` / `--vls-line-height` | Typography. |
 | `--vls-block-gap` | Vertical rhythm between blocks. |
 
-The code inside fences is colored by Shiki, configured separately via the `highlight` prop (`:highlight="{ theme: 'vitesse-dark' }"`) — pick a Shiki theme that matches your CSS theme. All selectors are scoped under `.vls-` classes, so importing the theme never restyles the host app.
+The code inside fences is colored by Shiki, configured via the `highlight` prop. By default it renders a light/dark pair (`github-light`/`github-dark`) as CSS variables that follow the color scheme — exactly like the `--vls-*` variables, including the `.vls-light`/`.vls-dark` forcing classes. Pass `:highlight="{ themes: { light: 'vitesse-light', dark: 'vitesse-dark' } }"` for a different pair, or `:highlight="{ theme: 'vitesse-dark' }"` for one fixed theme. All selectors are scoped under `.vls-` classes, so importing the theme never restyles the host app.
 
 ## Streaming markdown: how stabilization works
 
@@ -294,8 +296,8 @@ The same pass balances unterminated `*`/`_`/`` ` `` runs and drops a table row t
 - Retries only on network errors, HTTP 5xx, and HTTP 429 — nothing else is treated as transient.
 - Never retries once a token has been received: a stream that breaks mid-response can't be resumed, so it surfaces as `error.value = { kind: 'incomplete' }` with whatever text already arrived kept in `text.value`.
 - Never retries after a user-initiated `abort()` — that always resolves as `finishReason.value === 'aborted'`, not an error.
-- A 429 with a `Retry-After` header (seconds or HTTP-date) is honored up to a 10s clamp; anything longer is treated as non-retryable.
-- Without a server-provided delay, backoff is exponential from `retry.baseDelayMs` (default 500ms, equal jitter — each delay lands between 50% and 100% of the exponential step), for `retry.attempts` attempts (default 2).
+- A 429 or 5xx with a `Retry-After` header (seconds or HTTP-date) is honored up to a 10s clamp; anything longer is treated as non-retryable.
+- Without a server-provided delay, backoff is exponential from `retry.baseDelayMs` (default 500ms, equal jitter — each delay lands between 50% and 100% of the exponential step), for up to `retry.retries` retries after the initial request (default 2).
 - `regenerate()` restarts the whole call from scratch with the last input — it is not part of the retry loop and has its own fresh attempt budget.
 
 ## Recipes
@@ -341,7 +343,7 @@ One `useLlmStream` instance drives the whole conversation — don't create a new
 
 **Why not the Vercel AI SDK?** This is a Vue-native rendering and transport layer for your own endpoints — no framework lock-in, no assumption you're using a particular backend or hosting provider. Bring any SSE-compatible API.
 
-**Bundle size?** The core (`useLlmStream`, `useScrollAnchor`) has zero runtime dependencies. Shiki and markdown-it are only pulled in if you import `vue-llm-stream/markdown`, and Shiki loads lazily on first render.
+**Bundle size?** The core (`useLlmStream`, `useScrollAnchor`) has zero runtime dependencies. Shiki and markdown-it are only pulled in if you import `vue-llm-stream/markdown`, and Shiki is loaded with a dynamic import only when highlighting is enabled — `highlight: false` never loads it.
 
 **SSR / Nuxt?** All state is plain Vue refs, so components render fine on the server. `start()` calls `fetch` and reads a stream — it's client-only; call it from `onMounted` or a user interaction, not during SSR render.
 

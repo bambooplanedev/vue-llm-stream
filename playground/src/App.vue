@@ -12,10 +12,12 @@ const endpointUrl = ref('')
 const apiKey = ref('') // memory-only: never persisted anywhere
 const model = ref('')
 const simulateError = ref(false)
+const errorDemoRun = ref(0)
 
 const provider = computed(() => {
   if (preset.value === 'openai') return openaiCompatible({ apiKey: apiKey.value, model: model.value || 'gpt-4o-mini' })
   if (preset.value === 'anthropic') return anthropic({ apiKey: apiKey.value, model: model.value || 'claude-sonnet-5', maxTokens: 1024 })
+  void errorDemoRun.value // each send while simulating errors re-creates the mock
   return mock({
     text: DEMO_REPLY,
     tokensPerSec: 40,
@@ -38,12 +40,8 @@ const { isPinned, scrollToBottom } = useScrollAnchor(container)
 
 // One stream instance for the whole chat — never create a composable per
 // message; this single instance drives the visible assistant bubble.
-async function send() {
-  const content = input.value.trim()
-  if (!content || stream.isStreaming.value) return
-  input.value = ''
-  history.value.push({ role: 'user', content })
-  const final = await stream.start(history.value)
+async function finish(pending: Promise<string | undefined>) {
+  const final = await pending
   if (final !== undefined) {
     history.value.push({ role: 'assistant', content: final })
   } else if (stream.finishReason.value === 'aborted' && stream.text.value) {
@@ -51,6 +49,15 @@ async function send() {
     // so move what arrived into history
     history.value.push({ role: 'assistant', content: stream.text.value })
   }
+}
+
+async function send() {
+  const content = input.value.trim()
+  if (!content || stream.isStreaming.value) return
+  input.value = ''
+  if (simulateError.value) errorDemoRun.value++ // fresh mock → the demo fails every send
+  history.value.push({ role: 'user', content })
+  await finish(stream.start(history.value))
 }
 
 function onComposerKeydown(e: KeyboardEvent) {
@@ -83,15 +90,15 @@ watchEffect(() => {
   <main class="page" :class="{ streaming: stream.isStreaming.value }">
     <header class="bar">
       <span class="wordmark">vue-llm-stream</span>
-      <select v-model="preset" class="field">
+      <select v-model="preset" class="field" aria-label="Provider preset">
         <option value="mock">Mock (no key needed)</option>
         <option value="openai">OpenAI-compatible</option>
         <option value="anthropic">Anthropic</option>
       </select>
       <template v-if="preset !== 'mock'">
-        <input v-model="endpointUrl" class="field" placeholder="Endpoint URL (or leave default)" />
-        <input v-model="apiKey" class="field" type="password" placeholder="API key (memory only)" />
-        <input v-model="model" class="field" placeholder="Model" />
+        <input v-model="endpointUrl" class="field" placeholder="Endpoint URL (or leave default)" aria-label="Endpoint URL" />
+        <input v-model="apiKey" class="field" type="password" placeholder="API key (memory only)" aria-label="API key" />
+        <input v-model="model" class="field" placeholder="Model" aria-label="Model" />
         <small v-if="preset === 'openai'" class="hint">llama.cpp: run <code>llama-server -m model.gguf</code> → http://localhost:8080/v1/chat/completions</small>
       </template>
       <label v-else class="sim-error"><input v-model="simulateError" type="checkbox" /> Simulate network error (watch auto-retry)</label>
@@ -100,7 +107,7 @@ watchEffect(() => {
       </button>
     </header>
 
-    <section ref="container" class="chat">
+    <section ref="container" class="chat" role="log" aria-label="Conversation" tabindex="0">
       <article v-for="(m, i) in history" :key="i" :class="m.role">
         <StreamMarkdown v-if="m.role === 'assistant'" :text="m.content" status="done" />
         <p v-else>{{ m.content }}</p>
@@ -114,7 +121,7 @@ watchEffect(() => {
           <template #error>
             <div class="error-row">
               <span>{{ stream.error.value?.kind === 'incomplete' ? 'Response was cut off.' : 'Something went wrong.' }}</span>
-              <button class="btn" @click="stream.regenerate()">Retry</button>
+              <button class="btn" @click="finish(stream.regenerate())">Retry</button>
             </div>
           </template>
         </StreamMarkdown>
@@ -124,7 +131,7 @@ watchEffect(() => {
     <button v-if="!isPinned" class="btn to-bottom" @click="scrollToBottom">↓ New tokens</button>
 
     <footer class="composer">
-      <input v-model="input" class="field" placeholder="Ask anything…" @keydown.enter.exact="onComposerKeydown" />
+      <input v-model="input" class="field" placeholder="Ask anything…" aria-label="Message" @keydown.enter.exact="onComposerKeydown" />
       <button v-if="stream.isStreaming.value" class="btn" @click="stream.abort()">Stop</button>
       <button v-else class="btn btn-primary" :disabled="!input.trim()" @click="send">Send</button>
     </footer>

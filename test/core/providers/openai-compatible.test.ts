@@ -45,4 +45,25 @@ describe('openaiCompatible parser', () => {
     parse({ data: '{"choices":[{"delta":{},"finish_reason":"stop"}]}' })
     expect(parse({ data: '[DONE]' })).toEqual([{ type: 'done', usage: undefined, finishReason: 'stop' }])
   })
+
+  it('turns a top-level error payload into an error event', () => {
+    const parse = openaiCompatible({ model: 'm' }).createEventParser()
+    const events = parse({ data: '{"error":{"message":"rate limited","code":"rate_limit_exceeded"}}' })
+    expect(events).toEqual([
+      { type: 'error', error: { code: 'rate_limit_exceeded', message: 'rate limited' } },
+    ])
+  })
+
+  it('falls back to error.type as code and a default message', () => {
+    const parse = openaiCompatible({ model: 'm' }).createEventParser()
+    expect(parse({ data: '{"error":{"type":"invalid_request_error"}}' })).toEqual([
+      { type: 'error', error: { code: 'invalid_request_error', message: 'provider error' } },
+    ])
+  })
+
+  it('surfaces a string-shaped error payload as the message', () => {
+    const parse = openaiCompatible({ model: 'm' }).createEventParser()
+    const events = parse({ data: '{"error":"quota exceeded"}' })
+    expect(events).toEqual([{ type: 'error', error: { message: 'quota exceeded' } }])
+  })
 })

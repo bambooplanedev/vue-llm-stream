@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-vi.mock('shiki', () => ({
-  createHighlighter: vi.fn(async () => ({
+const { createHighlighterMock } = vi.hoisted(() => {
+  const createHighlighterMock = vi.fn(async () => ({
     codeToHtml: (code: string) => `<pre class="shiki">${code}</pre>`,
     getLoadedLanguages: () => ['javascript'],
-  })),
-}))
+  }))
+  return { createHighlighterMock }
+})
+vi.mock('shiki', () => ({ createHighlighter: createHighlighterMock }))
 
 import StreamMarkdown from '../../src/components/StreamMarkdown.vue'
 
@@ -69,5 +71,25 @@ describe('StreamMarkdown', () => {
     // element — matches the invariant asserted in renderer.test.ts; the
     // literal word "onerror" remains as harmless escaped text
     await vi.waitFor(() => expect(wrapper.html()).not.toContain('<img'))
+  })
+
+  it('rebuilds the highlighter when the highlight prop changes', async () => {
+    const wrapper = mount(StreamMarkdown, {
+      props: { text: '```js\nconst a = 1\n```', status: 'done', highlight: { theme: 'one-light' } },
+    })
+    await vi.waitFor(() => expect(createHighlighterMock.mock.calls.length).toBeGreaterThan(0))
+    const before = createHighlighterMock.mock.calls.length
+    await wrapper.setProps({ highlight: { theme: 'one-dark' } })
+    await vi.waitFor(() => expect(createHighlighterMock.mock.calls.length).toBe(before + 1))
+  })
+
+  it('does not rebuild when an equal inline highlight object is re-passed', async () => {
+    const wrapper = mount(StreamMarkdown, {
+      props: { text: 'x', status: 'done', highlight: { theme: 'rose-pine' } },
+    })
+    await vi.waitFor(() => expect(createHighlighterMock.mock.calls.length).toBeGreaterThan(0))
+    const before = createHighlighterMock.mock.calls.length
+    await wrapper.setProps({ highlight: { theme: 'rose-pine' } }) // new object, same config
+    expect(createHighlighterMock.mock.calls.length).toBe(before)
   })
 })

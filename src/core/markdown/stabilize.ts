@@ -39,6 +39,12 @@ function scanInlineLine(line: string, st: InlineState): void {
   let i = 0
   while (i < line.length) {
     const ch = line[i]!
+    // backslash escapes the next character — but only outside code spans,
+    // where backslashes are literal
+    if (ch === '\\' && st.codeTicks === 0) {
+      i += 2
+      continue
+    }
     if (ch === '`') {
       let n = 1
       while (line[i + n] === '`') n++

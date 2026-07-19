@@ -1,6 +1,6 @@
 {
   "name": "vue-llm-stream",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Streaming LLM responses for Vue 3 — SSE parsing, resilient retries, and token-by-token markdown rendering with live syntax highlighting.",
   "type": "module",
   "license": "MIT",
@@ -20,17 +20,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./providers": {
       "types": "./dist/providers.d.ts",
-      "import": "./dist/providers.js"
+      "default": "./dist/providers.js"
     },
     "./markdown": {
       "types": "./dist/markdown.d.ts",
-      "import": "./dist/markdown.js"
+      "default": "./dist/markdown.js"
     },
-    "./theme.css": "./dist/theme.css"
+    "./theme.css": "./dist/theme.css",
+    "./package.json": "./package.json"
   },
   "sideEffects": [
     "*.css"

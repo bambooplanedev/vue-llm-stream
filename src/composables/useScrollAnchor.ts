@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 
 export interface ScrollAnchorOptions {
   /** Distance from the bottom (px) still counted as "at bottom". */
@@ -6,7 +6,7 @@ export interface ScrollAnchorOptions {
 }
 
 export function useScrollAnchor(
-  container: Ref<HTMLElement | null>,
+  container: Ref<HTMLElement | null | undefined>,
   options: ScrollAnchorOptions = {},
 ) {
   const threshold = options.threshold ?? 40
@@ -47,7 +47,9 @@ export function useScrollAnchor(
       return
     }
     if (atBottom(el)) {
-      isPinned.value = true
+      // a clamp from shrinking content lands at the new bottom with a
+      // *decreased* scrollTop — only a non-upward scroll is the user returning
+      if (el.scrollTop >= prev) isPinned.value = true
       return
     }
     // a strict scrollTop decrease away from the bottom can only be the user
@@ -63,8 +65,6 @@ export function useScrollAnchor(
   }
 
   function attach(el: HTMLElement): void {
-    if (attached === el) return
-    if (attached) detach(attached)
     attached = el
     lastScrollTop = el.scrollTop
     el.addEventListener('scroll', onScroll, { passive: true })
@@ -104,15 +104,14 @@ export function useScrollAnchor(
     if (attached === el) attached = null
   }
 
+  // one immediate, sync-flushed watch covers every attach path: a
+  // pre-populated ref fires the immediate callback, a template ref fires
+  // synchronously when Vue assigns it during mount, and a watch only fires
+  // on real changes so double-attach can't happen
   watch(container, (el, old) => {
     if (old) detach(old)
     if (el) attach(el)
-  })
-
-  onMounted(() => {
-    const el = container.value
-    if (el && attached !== el) attach(el)
-  })
+  }, { immediate: true, flush: 'sync' })
 
   onBeforeUnmount(() => {
     if (attached) detach(attached)

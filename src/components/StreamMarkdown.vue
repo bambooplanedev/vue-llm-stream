@@ -16,10 +16,22 @@ const props = withDefaults(defineProps<{
 const blocks = ref<string[]>([])
 let rafId = 0
 
-const highlightFence = props.highlight === false
-  ? undefined
-  : createShikiHighlight({ ...props.highlight, onReady: () => scheduleRender(true) })
-const render = createMarkdownRenderer(highlightFence)
+function buildRenderer(opt: Omit<ShikiHighlightOptions, 'onReady'> | false) {
+  const fence = opt === false
+    ? undefined
+    : createShikiHighlight({ ...opt, onReady: () => scheduleRender(true) })
+  return createMarkdownRenderer(fence)
+}
+
+let render = buildRenderer(props.highlight)
+
+watch(() => props.highlight, (opt, old) => {
+  // inline object literals produce a new reference on every parent render —
+  // only rebuild when the config actually changed
+  if (JSON.stringify(opt) === JSON.stringify(old)) return
+  render = buildRenderer(opt)
+  scheduleRender(true)
+})
 
 function renderNow(): void {
   rafId = 0

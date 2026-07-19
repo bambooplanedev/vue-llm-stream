@@ -51,6 +51,11 @@ describe('streamRequest', () => {
     await expect(collect(res)).rejects.toMatchObject({ kind: 'http', status: 429, retryAfterMs: 3000 })
   })
 
+  it('attaches retryAfterMs on 503 too', async () => {
+    const res = new Response('{}', { status: 503, headers: { 'retry-after': '3' } })
+    await expect(collect(res)).rejects.toMatchObject({ kind: 'http', status: 503, retryAfterMs: 3000 })
+  })
+
   it('throws {kind:"http"} on 200 with wrong content-type', async () => {
     const res = new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })
     await expect(collect(res)).rejects.toMatchObject({ kind: 'http', status: 200 })
@@ -99,5 +104,15 @@ describe('streamRequest', () => {
     })
     for await (const _ of gen) break
     expect(cancelled).toBe(true)
+  })
+
+  it('reports a connection cut mid-frame as incomplete, not parse', async () => {
+    const jsonParser = (frame: SseFrame): StreamEvent[] => {
+      const j = JSON.parse(frame.data)
+      return j.t ? [{ type: 'text-delta', text: j.t }] : []
+    }
+    // clean EOF while a frame is half-written — flush() sees garbage JSON
+    const res = sseResponse(['data: {"t":"a"}\n\n', 'data: {"t":"hel'])
+    await expect(collect(res, jsonParser)).rejects.toMatchObject({ kind: 'incomplete' })
   })
 })

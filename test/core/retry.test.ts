@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isRetryable, parseRetryAfter, retryDelayMs } from '../../src/core/retry'
 import type { LlmStreamError } from '../../src/core/events'
 
-const OPTS = { attempts: 2, baseDelayMs: 500 }
+const OPTS = { retries: 2, baseDelayMs: 500 }
 const http = (status: number, retryAfterMs?: number): LlmStreamError =>
   ({ kind: 'http', status, message: 'x', retryAfterMs })
 

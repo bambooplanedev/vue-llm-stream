@@ -216,4 +216,17 @@ describe('useScrollAnchor', () => {
     expect(roDisconnectCalls).toHaveLength(allRO.length)
     expect(moDisconnectCalls).toHaveLength(allMO.length)
   })
+
+  it('does not re-pin when shrinking content clamps scrollTop into the bottom threshold', () => {
+    const { el, anchor } = build()
+    el.scrollTop = 100
+    el.dispatchEvent(new Event('wheel'))   // user intent away from bottom → unpin
+    el.dispatchEvent(new Event('scroll'))  // record the position (lastScrollTop = 100)
+    expect(anchor().isPinned.value).toBe(false)
+    // stabilizer drops a held-back row: content shrinks, the browser clamps
+    // scrollTop to the new max and fires a scroll event at the new bottom
+    fakeMetrics(el, { scrollHeight: 450, clientHeight: 400, scrollTop: 50 })
+    el.dispatchEvent(new Event('scroll'))
+    expect(anchor().isPinned.value).toBe(false) // still reading — do not yank
+  })
 })

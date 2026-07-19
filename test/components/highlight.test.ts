@@ -73,4 +73,22 @@ describe('createShikiHighlight', () => {
     hl('code 0', 'javascript', false) // evicted → re-highlighted
     expect(codeToHtml).toHaveBeenCalledTimes(1)
   })
+
+  it('defaults to a github-light/github-dark dual theme with CSS variables', async () => {
+    const hl = createShikiHighlight({})
+    await vi.waitFor(() => expect(hl('x', 'javascript', false)).not.toBeNull())
+    expect(codeToHtml).toHaveBeenLastCalledWith('x', expect.objectContaining({
+      themes: { light: 'github-light', dark: 'github-dark' },
+      defaultColor: false,
+    }))
+  })
+
+  it('theme takes precedence over themes', async () => {
+    // distinct code from the earlier 'nord' test — same shared cache entry,
+    // so reusing 'x' would hit the memoized result and skip codeToHtml
+    const hl = createShikiHighlight({ theme: 'nord', themes: { light: 'a', dark: 'b' } })
+    await vi.waitFor(() => expect(hl('precedence', 'javascript', false)).not.toBeNull())
+    expect(codeToHtml).toHaveBeenLastCalledWith('precedence', expect.objectContaining({ theme: 'nord' }))
+    expect(codeToHtml).toHaveBeenLastCalledWith('precedence', expect.not.objectContaining({ themes: expect.anything() }))
+  })
 })

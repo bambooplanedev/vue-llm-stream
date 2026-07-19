@@ -50,7 +50,7 @@ describe('useLlmStream', () => {
     vi.useFakeTimers()
     const provider = mock({ text: 'recovered', tokensPerSec: 100_000, failure: { kind: 'http', status: 500 }, failOnce: true })
     const { result: s } = inScope(() =>
-      useLlmStream({ url: 'mock://', provider, retry: { attempts: 2, baseDelayMs: 100 } }))
+      useLlmStream({ url: 'mock://', provider, retry: { retries: 2, baseDelayMs: 100 } }))
     const promise = s.start('hi')
     await vi.waitFor(() => expect(s.retryCount.value).toBe(1))
     expect(s.status.value).toBe('submitted') // backoff lives inside "submitted"
@@ -126,7 +126,7 @@ describe('useLlmStream', () => {
       buildRequest: () => { throw new Error('bad config') },
     }
     const { result: s } = inScope(() =>
-      useLlmStream({ url: 'mock://', provider, retry: { attempts: 2, baseDelayMs: 1 } }))
+      useLlmStream({ url: 'mock://', provider, retry: { retries: 2, baseDelayMs: 1 } }))
     const final = await s.start('hi')
     expect(final).toBeUndefined()
     expect(s.status.value).toBe('error')

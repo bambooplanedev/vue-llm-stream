@@ -31,6 +31,18 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
         if (!frame.data) return [] // event-only heartbeat frames carry no JSON
         if (frame.data === '[DONE]') return [{ type: 'done', usage, finishReason }]
         const json = JSON.parse(frame.data)
+        // OpenRouter, Azure, vLLM and other proxies report failures as a data
+        // frame with a top-level error object, then close without [DONE] —
+        // surface it instead of letting the stream EOF as a generic incomplete
+        if (json.error) {
+          const err = json.error
+          return [{
+            type: 'error',
+            error: typeof err === 'string'
+              ? { message: err }
+              : { code: err.code ?? err.type, message: err.message ?? 'provider error' },
+          }]
+        }
         if (json.usage) {
           usage = { inputTokens: json.usage.prompt_tokens, outputTokens: json.usage.completion_tokens }
         }

@@ -1,7 +1,8 @@
 import type { LlmStreamError } from './events.js'
 
 export interface RetryOptions {
-  attempts?: number
+  /** Number of retries after the initial request (default 2). The first request is not counted. */
+  retries?: number
   baseDelayMs?: number
 }
 

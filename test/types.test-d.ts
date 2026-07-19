@@ -1,10 +1,15 @@
 import { describe, expectTypeOf, it } from 'vitest'
-import type { Ref } from 'vue'
-import { useLlmStream, type LlmStreamStatus } from '../src/index'
+import { ref, type Ref } from 'vue'
+import { useLlmStream, useScrollAnchor, type LlmStreamStatus, type UseLlmStreamReturn } from '../src/index'
 import { mock } from '../src/providers'
-import type { ChatMessage, LlmStreamError } from '../src/index'
+import type { ChatMessage, LlmProvider, LlmStreamError } from '../src/index'
 
 describe('type surface', () => {
+  it('exports the return type as UseLlmStreamReturn', () => {
+    const s = useLlmStream({ url: 'x', provider: mock({ text: 'hi' }) })
+    expectTypeOf(s).toEqualTypeOf<UseLlmStreamReturn>()
+  })
+
   it('useLlmStream returns the documented shape', () => {
     const s = useLlmStream({ url: 'x', provider: mock({ text: 'hi' }) })
     expectTypeOf(s.text).toEqualTypeOf<Ref<string>>()
@@ -22,5 +27,14 @@ describe('type surface', () => {
     const e = {} as LlmStreamError
     if (e.kind === 'http') expectTypeOf(e.status).toEqualTypeOf<number>()
     if (e.kind === 'incomplete') expectTypeOf(e).not.toHaveProperty('status')
+  })
+
+  it('buildRequest body is a plain object, not unknown', () => {
+    expectTypeOf<ReturnType<LlmProvider['buildRequest']>['body']>().toEqualTypeOf<Record<string, unknown>>()
+  })
+
+  it('useScrollAnchor accepts the idiomatic ref<HTMLElement>()', () => {
+    const el = ref<HTMLElement>()
+    useScrollAnchor(el)
   })
 })

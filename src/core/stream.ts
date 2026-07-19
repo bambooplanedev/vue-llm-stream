@@ -33,7 +33,7 @@ export async function* streamRequest(opts: StreamRequestOptions): AsyncGenerator
       message = parsed?.error?.message ?? parsed?.message ?? message
     } catch { /* body was not JSON — keep raw text */ }
     const retryAfterHeader = res.headers.get('retry-after')
-    const retryAfterMs = res.status === 429 && retryAfterHeader
+    const retryAfterMs = retryAfterHeader && (res.status === 429 || res.status >= 500)
       ? parseRetryAfter(retryAfterHeader) ?? undefined
       : undefined
     throw { kind: 'http', status: res.status, message, body, retryAfterMs }
@@ -83,7 +83,16 @@ export async function* streamRequest(opts: StreamRequestOptions): AsyncGenerator
       if (step.done) {
         // final flush: trailing partial code point + trailing frame
         yield* emit(frames.push(decoder.decode()))
-        yield* emit(frames.flush())
+        try {
+          yield* emit(frames.flush())
+        } catch (e) {
+          // a frame cut short by a dropped connection parses as garbage —
+          // that is a truncated stream, not a provider payload bug
+          if (!sawDone && typeof e === 'object' && e !== null && (e as { kind?: string }).kind === 'parse') {
+            throw { kind: 'incomplete' }
+          }
+          throw e
+        }
         break
       }
       yield* emit(frames.push(decoder.decode(step.value, { stream: true })))

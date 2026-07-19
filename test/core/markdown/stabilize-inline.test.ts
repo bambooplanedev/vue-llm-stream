@@ -53,4 +53,21 @@ describe('stabilizeMarkdown — inline', () => {
   it('still closes genuine underscore emphasis', () => {
     expect(out('some _emphasi')).toBe('some _emphasi_')
   })
+
+  it('does not treat an escaped asterisk as an emphasis opener', () => {
+    expect(out('foo \\*bar')).toBe('foo \\*bar')
+  })
+
+  it('does not treat an escaped backtick as a code-span opener', () => {
+    expect(out('type \\` to quote')).toBe('type \\` to quote')
+  })
+
+  it('still closes genuine unterminated emphasis', () => {
+    expect(out('some *emphasis')).toBe('some *emphasis*')
+  })
+
+  it('treats backslash as literal inside a code span', () => {
+    // inside code spans backslashes do not escape — the second backtick closes
+    expect(out('x `a\\` y')).toBe('x `a\\` y')
+  })
 })

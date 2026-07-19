@@ -29,7 +29,7 @@ export interface SseFrame {
 }
 
 export interface LlmProvider {
-  buildRequest(ctx: { messages: ChatMessage[] }): { body: unknown; headers: Record<string, string> }
+  buildRequest(ctx: { messages: ChatMessage[] }): { body: Record<string, unknown>; headers: Record<string, string> }
   createEventParser(): (frame: SseFrame) => StreamEvent[]
   /** Optional fetch override — used by the mock provider to avoid the network. */
   fetch?: typeof globalThis.fetch

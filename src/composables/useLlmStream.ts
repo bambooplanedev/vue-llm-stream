@@ -42,7 +42,21 @@ function sleep(ms: number, signal: AbortSignal): Promise<boolean> {
   })
 }
 
-export function useLlmStream(options: UseLlmStreamOptions) {
+export interface UseLlmStreamReturn {
+  text: Ref<string>
+  reasoning: Ref<string>
+  status: Ref<LlmStreamStatus>
+  isStreaming: ComputedRef<boolean>
+  finishReason: Ref<FinishReason | null>
+  error: Ref<LlmStreamError | null>
+  usage: Ref<Usage | null>
+  retryCount: Ref<number>
+  start: (input: string | ChatMessage[], opts?: PerCallOptions) => Promise<string | undefined>
+  abort: () => void
+  regenerate: () => Promise<string | undefined>
+}
+
+export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
   const text = ref('')
   const reasoning = ref('')
   const status = ref<LlmStreamStatus>('idle')
@@ -87,7 +101,7 @@ export function useLlmStream(options: UseLlmStreamOptions) {
 
     const retryOpts = options.retry === false
       ? null
-      : { attempts: 2, baseDelayMs: 500, ...options.retry }
+      : { retries: 2, baseDelayMs: 500, ...options.retry }
     let attempt = 0
     let sawToken = false
 
@@ -118,7 +132,7 @@ export function useLlmStream(options: UseLlmStreamOptions) {
       try {
         for await (const ev of streamRequest({
           url: toValue(options.url),
-          body: { ...(req.body as Record<string, unknown>), ...toValue(options.body), ...perCall?.body },
+          body: { ...req.body, ...toValue(options.body), ...perCall?.body },
           headers: { ...req.headers, ...toValue(options.headers), ...perCall?.headers },
           signal: ctl.signal,
           parser: provider.createEventParser(),
@@ -154,7 +168,7 @@ export function useLlmStream(options: UseLlmStreamOptions) {
         // classify abort by the signal, never by exception type
         if (ctl.signal.aborted) return finishAborted()
         const err = normalizeStreamError(e)
-        if (retryOpts && !sawToken && attempt < retryOpts.attempts && isRetryable(err)) {
+        if (retryOpts && !sawToken && attempt < retryOpts.retries && isRetryable(err)) {
           const delay = retryDelayMs(attempt, err, retryOpts)
           if (delay !== null) {
             attempt++
@@ -181,13 +195,5 @@ export function useLlmStream(options: UseLlmStreamOptions) {
   return {
     text, reasoning, status, isStreaming, finishReason, error, usage, retryCount,
     start, abort, regenerate,
-  } as {
-    text: Ref<string>; reasoning: Ref<string>
-    status: Ref<LlmStreamStatus>; isStreaming: ComputedRef<boolean>
-    finishReason: Ref<FinishReason | null>; error: Ref<LlmStreamError | null>
-    usage: Ref<Usage | null>; retryCount: Ref<number>
-    start: (input: string | ChatMessage[], opts?: PerCallOptions) => Promise<string | undefined>
-    abort: () => void
-    regenerate: () => Promise<string | undefined>
   }
 }
