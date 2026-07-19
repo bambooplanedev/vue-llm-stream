@@ -10,6 +10,8 @@ const TABLE_DELIM_RE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/
 interface FenceState {
   char: string
   len: number
+  /** container prefix of the opening line, so the auto-close matches it */
+  prefix: string
 }
 
 /** Strip blockquote/list container prefixes so nested fences are tracked. */
@@ -85,11 +87,19 @@ export function stabilizeMarkdown(input: string): StabilizedMarkdown {
   let prevLineHadPipe = false
 
   for (const rawLine of lines) {
-    const line = stripContainers(rawLine.replace(/\r$/, ''))
+    const raw = rawLine.replace(/\r$/, '')
+    const line = stripContainers(raw)
     const m = FENCE_RE.exec(line)
     if (m) {
       const marks = m[1]!
-      if (!open) open = { char: marks[0]!, len: marks.length }
+      if (!open) {
+        // a fence opened inside a blockquote/list must be closed with the same
+        // container prefix, or the appended fence opens a phantom top-level
+        // block; list markers become spaces so the closer continues the item
+        const prefix = raw.slice(0, raw.length - line.length)
+          .replace(/[-*+]|\d{1,9}[.)]/g, (mk) => ' '.repeat(mk.length))
+        open = { char: marks[0]!, len: marks.length, prefix }
+      }
       else if (marks[0] === open.char && marks.length >= open.len && m[2]!.trim() === '') open = null
       inline = freshInline() // fence line = paragraph boundary
       inTable = false
@@ -119,7 +129,7 @@ export function stabilizeMarkdown(input: string): StabilizedMarkdown {
   }
 
   if (open) {
-    text += (text.endsWith('\n') ? '' : '\n') + open.char.repeat(open.len)
+    text += (text.endsWith('\n') ? '' : '\n') + open.prefix + open.char.repeat(open.len)
     return { text, autoClosedFence: true }
   }
 

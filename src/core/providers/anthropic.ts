@@ -34,6 +34,7 @@ export function anthropic(config: AnthropicConfig): LlmProvider {
       const usage: Usage = {}
       let finishReason: FinishReason = 'unknown'
       return (frame) => {
+        if (!frame.data) return [] // event-only heartbeat frames carry no JSON
         const json = JSON.parse(frame.data)
         switch (json.type) {
           case 'message_start':

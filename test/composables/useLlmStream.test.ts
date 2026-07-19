@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
 import { useLlmStream } from '../../src/composables/useLlmStream'
+import type { ChatMessage, LlmProvider } from '../../src/core/events'
 import { mock } from '../../src/core/providers/mock'
 
 afterEach(() => {
@@ -107,6 +108,45 @@ describe('useLlmStream', () => {
     scope.stop()
     expect(await promise).toBeUndefined()
     expect(s.finishReason.value).toBe('aborted')
+  })
+
+  it('resolves a getter provider at start() time — swap takes effect', async () => {
+    let provider = fast('first')
+    const { result: s } = inScope(() => useLlmStream({ url: 'mock://', provider: () => provider }))
+    await s.start('hi')
+    expect(s.text.value).toBe('first')
+    provider = fast('second')
+    await s.start('hi')
+    expect(s.text.value).toBe('second')
+  })
+
+  it('a throwing buildRequest surfaces as a provider error, never retried', async () => {
+    const provider: LlmProvider = {
+      ...fast(),
+      buildRequest: () => { throw new Error('bad config') },
+    }
+    const { result: s } = inScope(() =>
+      useLlmStream({ url: 'mock://', provider, retry: { attempts: 2, baseDelayMs: 1 } }))
+    const final = await s.start('hi')
+    expect(final).toBeUndefined()
+    expect(s.status.value).toBe('error')
+    expect(s.error.value).toMatchObject({ kind: 'provider' })
+    expect(s.retryCount.value).toBe(0)
+  })
+
+  it('start() copies the input array so later pushes do not leak into regenerate()', async () => {
+    const base = fast('reply')
+    const seen: ChatMessage[][] = []
+    const provider: LlmProvider = {
+      ...base,
+      buildRequest: (ctx) => { seen.push([...ctx.messages]); return base.buildRequest(ctx) },
+    }
+    const { result: s } = inScope(() => useLlmStream({ url: 'mock://', provider }))
+    const history: ChatMessage[] = [{ role: 'user', content: 'q' }]
+    await s.start(history)
+    history.push({ role: 'assistant', content: 'reply' })
+    await s.regenerate()
+    expect(seen[1]).toEqual([{ role: 'user', content: 'q' }])
   })
 
   it('resolves reactive url at start() time', async () => {

@@ -28,6 +28,7 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
       let usage: Usage | undefined
       let finishReason: FinishReason = 'unknown'
       return (frame) => {
+        if (!frame.data) return [] // event-only heartbeat frames carry no JSON
         if (frame.data === '[DONE]') return [{ type: 'done', usage, finishReason }]
         const json = JSON.parse(frame.data)
         if (json.usage) {

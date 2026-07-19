@@ -11,19 +11,43 @@ export interface ShikiHighlightOptions {
   onReady?: () => void
 }
 
+interface SharedHighlighter {
+  highlighter: Highlighter | null
+  ready: Promise<void>
+  cache: Map<string, string>
+}
+
+// one highlighter + memo cache per (theme, langs) tuple — Shiki instances hold
+// compiled grammars, so every component with the same config must share one
+const shared = new Map<string, SharedHighlighter>()
+
+function getShared(theme: string, langs: string[]): SharedHighlighter {
+  const key = `${theme}\u0000${[...langs].sort().join(',')}`
+  let entry = shared.get(key)
+  if (!entry) {
+    const e: SharedHighlighter = { highlighter: null, ready: Promise.resolve(), cache: new Map() }
+    e.ready = createHighlighter({ themes: [theme], langs })
+      .then((h) => { e.highlighter = h })
+      .catch(() => { /* highlighter unavailable — plain <pre> fallback remains */ })
+    shared.set(key, e)
+    entry = e
+  }
+  return entry
+}
+
 export function createShikiHighlight(options: ShikiHighlightOptions): HighlightFence {
   const theme = options.theme ?? 'github-dark'
-  let highlighter: Highlighter | null = null
-  const cache = new Map<string, string>()
-
-  createHighlighter({ themes: [theme], langs: options.langs ?? DEFAULT_LANGS })
-    .then((h) => {
-      highlighter = h
-      options.onReady?.()
-    })
-    .catch(() => { /* highlighter unavailable — plain <pre> fallback remains */ })
+  const entry = getShared(theme, options.langs ?? DEFAULT_LANGS)
+  const onReady = options.onReady
+  if (onReady) {
+    // fan-out: every instance gets its own ready callback; if the shared
+    // highlighter already loaded this fires on the next microtask
+    entry.ready.then(() => { if (entry.highlighter) onReady() })
+  }
+  const cache = entry.cache
 
   return (code, lang, isOpen) => {
+    const highlighter = entry.highlighter
     if (!highlighter) return null
     const resolved = highlighter.getLoadedLanguages().includes(lang) ? lang : 'text'
     const key = `${resolved}:${code}`

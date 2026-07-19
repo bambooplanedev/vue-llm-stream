@@ -30,6 +30,18 @@ describe('stabilizeMarkdown — fences', () => {
     expect(stabilizeMarkdown('- item\n  ```js\n  x').autoClosedFence).toBe(true)
   })
 
+  it('closes a blockquote fence with the blockquote prefix', () => {
+    expect(stabilizeMarkdown('> ```js\n> const a = 1')).toEqual({
+      text: '> ```js\n> const a = 1\n> ```', autoClosedFence: true,
+    })
+  })
+
+  it('closes a list-indented fence with the continuation indent', () => {
+    expect(stabilizeMarkdown('- item\n  ```js\n  const a = 1')).toEqual({
+      text: '- item\n  ```js\n  const a = 1\n  ```', autoClosedFence: true,
+    })
+  })
+
   it('holds back a partial trailing fence line (` or ``)', () => {
     expect(stabilizeMarkdown('text\n``').text).toBe('text')
     expect(stabilizeMarkdown('text\n`').text).toBe('text')

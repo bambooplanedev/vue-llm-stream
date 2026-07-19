@@ -37,6 +37,7 @@
     "test:watch": "vitest",
     "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-vue-dts.mjs",
     "check:package": "publint && attw --pack . --profile esm-only",
+    "prepublishOnly": "npm run build && npm run check:package",
     "play": "vite --config playground/vite.config.ts playground",
     "play:build": "vite build --config playground/vite.config.ts playground"
   },
@@ -52,7 +53,7 @@
   ],
   "peerDependencies": {
     "markdown-it": "^14.0.0",
-    "shiki": "^1.0.0",
+    "shiki": "^1.22.0 || ^2.0.0 || ^3.0.0",
     "vue": "^3.4.0"
   },
   "peerDependenciesMeta": {

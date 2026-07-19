@@ -15,7 +15,7 @@ export interface PerCallOptions {
 
 export interface UseLlmStreamOptions {
   url: MaybeRefOrGetter<string>
-  provider: LlmProvider
+  provider: MaybeRefOrGetter<LlmProvider>
   headers?: MaybeRefOrGetter<Record<string, string> | undefined>
   body?: MaybeRefOrGetter<Record<string, unknown> | undefined>
   fetch?: typeof globalThis.fetch
@@ -66,8 +66,9 @@ export function useLlmStream(options: UseLlmStreamOptions) {
   }
 
   async function start(input: string | ChatMessage[], perCall?: PerCallOptions): Promise<string | undefined> {
+    // copy the array — regenerate() must not see messages pushed after start()
     const messages: ChatMessage[] =
-      typeof input === 'string' ? [{ role: 'user', content: input }] : input
+      typeof input === 'string' ? [{ role: 'user', content: input }] : [...input]
     lastInput = messages
     lastPerCall = perCall
 
@@ -98,15 +99,30 @@ export function useLlmStream(options: UseLlmStreamOptions) {
     }
 
     while (true) {
+      const provider = toValue(options.provider)
+      // a throwing buildRequest is deterministic misconfiguration, not a
+      // transient network failure — surface it without burning the retry budget
+      let req: ReturnType<LlmProvider['buildRequest']>
       try {
-        const req = options.provider.buildRequest({ messages })
+        req = provider.buildRequest({ messages })
+      } catch (e) {
+        const err: LlmStreamError = {
+          kind: 'provider',
+          message: e instanceof Error ? e.message : String(e),
+        }
+        error.value = err
+        status.value = 'error'
+        options.onError?.(err)
+        return undefined
+      }
+      try {
         for await (const ev of streamRequest({
           url: toValue(options.url),
           body: { ...(req.body as Record<string, unknown>), ...toValue(options.body), ...perCall?.body },
           headers: { ...req.headers, ...toValue(options.headers), ...perCall?.headers },
           signal: ctl.signal,
-          parser: options.provider.createEventParser(),
-          fetchImpl: options.provider.fetch ?? options.fetch,
+          parser: provider.createEventParser(),
+          fetchImpl: provider.fetch ?? options.fetch,
         })) {
           if (gen !== generation) return undefined
           switch (ev.type) {

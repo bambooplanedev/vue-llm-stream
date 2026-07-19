@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const codeToHtml = vi.fn((code: string) => `<pre class="shiki">${code}</pre>`)
-vi.mock('shiki', () => ({
-  createHighlighter: vi.fn(async () => ({
+const { codeToHtml, createHighlighterMock } = vi.hoisted(() => {
+  const codeToHtml = vi.fn((code: string) => `<pre class="shiki">${code}</pre>`)
+  const createHighlighterMock = vi.fn(async () => ({
     codeToHtml,
     getLoadedLanguages: () => ['javascript', 'python'],
-  })),
-}))
+  }))
+  return { codeToHtml, createHighlighterMock }
+})
+vi.mock('shiki', () => ({ createHighlighter: createHighlighterMock }))
 
 import { createShikiHighlight } from '../../src/components/highlight'
 
@@ -39,6 +41,27 @@ describe('createShikiHighlight', () => {
     hl('const x = 1', 'javascript', false)
     hl('const x = 1', 'javascript', false)
     expect(codeToHtml).toHaveBeenCalledTimes(1) // closed fence: cached
+  })
+
+  it('shares one highlighter between instances with identical config, onReady fires per instance', async () => {
+    const before = createHighlighterMock.mock.calls.length
+    let readyA = false
+    let readyB = false
+    const a = createShikiHighlight({ theme: 'nord', onReady: () => { readyA = true } })
+    const b = createShikiHighlight({ theme: 'nord', onReady: () => { readyB = true } })
+    await vi.waitFor(() => expect(readyA && readyB).toBe(true))
+    expect(createHighlighterMock.mock.calls.length).toBe(before + 1)
+    expect(a('x', 'javascript', false)).toContain('shiki')
+    expect(b('x', 'javascript', false)).toContain('shiki')
+  })
+
+  it('creates distinct highlighters for different themes', async () => {
+    const before = createHighlighterMock.mock.calls.length
+    const a = createShikiHighlight({ theme: 'vitesse-dark' })
+    const b = createShikiHighlight({ theme: 'vitesse-light' })
+    await vi.waitFor(() => expect(a('x', 'javascript', false)).not.toBeNull())
+    await vi.waitFor(() => expect(b('x', 'javascript', false)).not.toBeNull())
+    expect(createHighlighterMock.mock.calls.length).toBe(before + 2)
   })
 
   it('LRU evicts beyond 50 entries', async () => {

@@ -32,7 +32,7 @@ const history = ref<ChatMessage[]>([])
 const input = ref('')
 const container = ref<HTMLElement | null>(null)
 
-const stream = useLlmStream({ url, provider: provider.value })
+const stream = useLlmStream({ url, provider })
 const { isPinned, scrollToBottom } = useScrollAnchor(container)
 
 // One stream instance for the whole chat — never create a composable per
@@ -50,6 +50,11 @@ async function send() {
     // so move what arrived into history
     history.value.push({ role: 'assistant', content: stream.text.value })
   }
+}
+
+function onComposerKeydown(e: KeyboardEvent) {
+  // Enter during IME composition confirms the composition, not the message
+  if (!e.isComposing) send()
 }
 </script>
 
@@ -95,7 +100,7 @@ async function send() {
     <button v-if="!isPinned" class="to-bottom" @click="scrollToBottom">↓ New tokens</button>
 
     <footer class="composer">
-      <input v-model="input" placeholder="Ask anything…" @keydown.enter="send" />
+      <input v-model="input" placeholder="Ask anything…" @keydown.enter.exact="onComposerKeydown" />
       <button v-if="stream.isStreaming.value" @click="stream.abort()">Stop</button>
       <button v-else @click="send">Send</button>
     </footer>

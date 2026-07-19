@@ -34,6 +34,11 @@ describe('openaiCompatible parser', () => {
       { type: 'done', usage: { inputTokens: 3, outputTokens: 7 }, finishReason: 'max_tokens' },
     ])
   })
+  it('ignores event-only frames with empty data (proxy heartbeats)', () => {
+    const parse = provider.createEventParser()
+    expect(parse({ event: 'ping', data: '' })).toEqual([])
+  })
+
   it('maps finish_reason stop', () => {
     const parse = provider.createEventParser()
     parse({ data: '{"choices":[{"delta":{"content":"x"},"finish_reason":null}]}' })

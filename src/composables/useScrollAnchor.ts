@@ -12,6 +12,7 @@ export function useScrollAnchor(
   const threshold = options.threshold ?? 40
   const isPinned = ref(true)
   let programmatic = false
+  let lastScrollTop = 0
   let ro: ResizeObserver | null = null
   let mo: MutationObserver | null = null
   let attached: HTMLElement | null = null
@@ -37,12 +38,21 @@ export function useScrollAnchor(
   }
 
   function onScroll(): void {
+    const el = container.value
+    if (!el) return
+    const prev = lastScrollTop
+    lastScrollTop = el.scrollTop
     if (programmatic) {
       programmatic = false
       return
     }
-    const el = container.value
-    if (el && atBottom(el)) isPinned.value = true
+    if (atBottom(el)) {
+      isPinned.value = true
+      return
+    }
+    // a strict scrollTop decrease away from the bottom can only be the user
+    // moving up (scrollbar drag, PageUp…) — content growth never decreases it
+    if (el.scrollTop < prev) isPinned.value = false
   }
 
   // detach on user *intent* (wheel/touchmove), not on scroll events —
@@ -56,6 +66,7 @@ export function useScrollAnchor(
     if (attached === el) return
     if (attached) detach(attached)
     attached = el
+    lastScrollTop = el.scrollTop
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('wheel', onUserIntent, { passive: true })
     el.addEventListener('touchmove', onUserIntent, { passive: true })

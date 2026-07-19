@@ -45,6 +45,11 @@ describe('anthropic parser', () => {
     ])
   })
 
+  it('ignores event-only frames with empty data (proxy heartbeats)', () => {
+    const parse = provider.createEventParser()
+    expect(parse({ event: 'ping', data: '' })).toEqual([])
+  })
+
   it('maps in-stream error events with their payload', () => {
     const parse = provider.createEventParser()
     expect(parse({ event: 'error', data: '{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}' }))

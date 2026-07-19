@@ -48,4 +48,26 @@ describe('createMarkdownRenderer', () => {
       ['streaming\n', 'py', true],
     ])
   })
+
+  it('marks the real fence open when auto-closing inside a blockquote — no phantom fence', () => {
+    const calls: Array<[string, string, boolean]> = []
+    const render2 = createMarkdownRenderer((code, lang, isOpen) => {
+      calls.push([code, lang, isOpen])
+      return null
+    })
+    const { html } = render2('> ```js\n> const a = 1')
+    expect(calls).toEqual([['const a = 1\n', 'js', true]])
+    expect((html.match(/<pre/g) ?? []).length).toBe(1)
+  })
+
+  it('marks the real fence open when auto-closing inside a list item — no phantom fence', () => {
+    const calls: Array<[string, string, boolean]> = []
+    const render2 = createMarkdownRenderer((code, lang, isOpen) => {
+      calls.push([code, lang, isOpen])
+      return null
+    })
+    const { html } = render2('- item\n  ```js\n  const a = 1')
+    expect(calls).toEqual([['const a = 1\n', 'js', true]])
+    expect((html.match(/<pre/g) ?? []).length).toBe(1)
+  })
 })

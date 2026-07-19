@@ -129,6 +129,24 @@ describe('useScrollAnchor', () => {
     expect(el.scrollTop).toBe(1500) // re-stuck while pinned
   })
 
+  it('unpins when a scroll strictly decreases scrollTop away from bottom (scrollbar drag / PageUp)', () => {
+    const { el, anchor } = build()
+    el.dispatchEvent(new Event('scroll')) // observe the at-bottom position (600)
+    expect(anchor().isPinned.value).toBe(true)
+    el.scrollTop = 300 // drag the thumb up — fires only scroll, no wheel/touchmove
+    el.dispatchEvent(new Event('scroll'))
+    expect(anchor().isPinned.value).toBe(false)
+  })
+
+  it('does not unpin on growth-driven scroll events (scrollTop unchanged)', () => {
+    const { el, anchor } = build()
+    el.dispatchEvent(new Event('scroll')) // observe the at-bottom position (600)
+    // streamed content grows the scrollHeight; scrollTop stays where it was
+    fakeMetrics(el, { scrollHeight: 1400, clientHeight: 400, scrollTop: 600 })
+    el.dispatchEvent(new Event('scroll'))
+    expect(anchor().isPinned.value).toBe(true)
+  })
+
   it('does not let a movement-free scrollToBottom swallow the next scroll', () => {
     const { el, anchor } = build()
     el.scrollTop = 1000
