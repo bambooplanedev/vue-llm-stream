@@ -1,4 +1,4 @@
-import type { LlmProvider } from '../events'
+import type { LlmProvider } from '../events.js'
 
 export type MockFailure =
   | { kind: 'http'; status: number }

@@ -1,5 +1,5 @@
 import { createHighlighter, type Highlighter } from 'shiki'
-import type { HighlightFence } from './renderer'
+import type { HighlightFence } from './renderer.js'
 
 const DEFAULT_LANGS = ['javascript', 'typescript', 'python', 'json', 'bash', 'html', 'css', 'markdown', 'vue']
 const CACHE_LIMIT = 50

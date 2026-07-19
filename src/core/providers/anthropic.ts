@@ -1,4 +1,4 @@
-import type { FinishReason, LlmProvider, Usage } from '../events'
+import type { FinishReason, LlmProvider, Usage } from '../events.js'
 
 export interface AnthropicConfig {
   apiKey: string

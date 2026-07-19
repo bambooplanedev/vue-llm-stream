@@ -2,9 +2,9 @@ import {
   computed, getCurrentScope, onScopeDispose, ref, shallowRef, toValue,
   type ComputedRef, type MaybeRefOrGetter, type Ref,
 } from 'vue'
-import type { ChatMessage, FinishReason, LlmProvider, LlmStreamError, Usage } from '../core/events'
-import { isRetryable, retryDelayMs, type RetryOptions } from '../core/retry'
-import { streamRequest } from '../core/stream'
+import type { ChatMessage, FinishReason, LlmProvider, LlmStreamError, Usage } from '../core/events.js'
+import { isRetryable, retryDelayMs, type RetryOptions } from '../core/retry.js'
+import { streamRequest } from '../core/stream.js'
 
 export type LlmStreamStatus = 'idle' | 'submitted' | 'streaming' | 'done' | 'error'
 

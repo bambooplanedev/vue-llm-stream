@@ -1,6 +1,6 @@
-import type { SseFrame, StreamEvent } from './events'
-import { createSseFrameParser } from './sse'
-import { parseRetryAfter } from './retry'
+import type { SseFrame, StreamEvent } from './events.js'
+import { createSseFrameParser } from './sse.js'
+import { parseRetryAfter } from './retry.js'
 
 export interface StreamRequestOptions {
   url: string

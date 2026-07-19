@@ -1,9 +1,8 @@
-export { useLlmStream } from './composables/useLlmStream'
-export type { LlmStreamStatus, PerCallOptions, UseLlmStreamOptions } from './composables/useLlmStream'
-export { useScrollAnchor } from './composables/useScrollAnchor'
-export type { ScrollAnchorOptions } from './composables/useScrollAnchor'
+export { useLlmStream } from './composables/useLlmStream.js'
+export type { LlmStreamStatus, PerCallOptions, UseLlmStreamOptions } from './composables/useLlmStream.js'
+export { useScrollAnchor } from './composables/useScrollAnchor.js'
+export type { ScrollAnchorOptions } from './composables/useScrollAnchor.js'
 export type {
   ChatMessage, FinishReason, LlmProvider, LlmStreamError, SseFrame, StreamEvent, Usage,
-} from './core/events'
-export type { RetryOptions } from './core/retry'
-
+} from './core/events.js'
+export type { RetryOptions } from './core/retry.js'

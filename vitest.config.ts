@@ -5,5 +5,6 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
+    typecheck: { enabled: true, checker: 'vue-tsc', include: ['test/**/*.test-d.ts'] },
   },
 })

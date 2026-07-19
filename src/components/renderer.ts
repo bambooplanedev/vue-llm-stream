@@ -1,5 +1,5 @@
 import MarkdownIt from 'markdown-it'
-import { stabilizeMarkdown } from '../core/markdown/stabilize'
+import { stabilizeMarkdown } from '../core/markdown/stabilize.js'
 
 export interface RenderResult {
   html: string

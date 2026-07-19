@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
-import type { LlmStreamStatus } from '../composables/useLlmStream'
-import { createMarkdownRenderer } from './renderer'
-import { createShikiHighlight, type ShikiHighlightOptions } from './highlight'
+import type { LlmStreamStatus } from '../composables/useLlmStream.js'
+import { createMarkdownRenderer } from './renderer.js'
+import { createShikiHighlight, type ShikiHighlightOptions } from './highlight.js'
 
 const props = withDefaults(defineProps<{
   text: string

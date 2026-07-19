@@ -1,4 +1,4 @@
-import type { LlmStreamError } from './events'
+import type { LlmStreamError } from './events.js'
 
 export interface RetryOptions {
   attempts?: number

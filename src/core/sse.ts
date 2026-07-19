@@ -1,4 +1,4 @@
-import type { SseFrame } from './events'
+import type { SseFrame } from './events.js'
 
 
 // Incremental SSE frame parser. Provider agnostic.
