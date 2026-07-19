@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   highlight: () => ({}),
 })
 
-const html = ref('')
+const blocks = ref<string[]>([])
 let rafId = 0
 
 const highlightFence = props.highlight === false
@@ -23,7 +23,7 @@ const render = createMarkdownRenderer(highlightFence)
 
 function renderNow(): void {
   rafId = 0
-  html.value = render(props.text).html
+  blocks.value = render(props.text).blocks
 }
 
 function scheduleRender(immediate = false): void {
@@ -53,8 +53,13 @@ onUnmounted(() => {
 <template>
   <div class="vls-stream-markdown">
     <slot v-if="status === 'submitted' && !text" name="loading" />
-    <!-- eslint-disable-next-line vue/no-v-html — markdown-it output with html:false -->
-    <div v-else class="vls-content" v-html="html" />
+    <div v-else class="vls-content">
+      <!-- one node per top-level block: settled blocks keep the same HTML
+           string between frames, so Vue never touches their DOM — only the
+           streaming tail block is re-rendered -->
+      <!-- eslint-disable-next-line vue/no-v-html — markdown-it output with html:false -->
+      <div v-for="(block, i) in blocks" :key="i" class="vls-block" v-html="block" />
+    </div>
     <slot v-if="status === 'error'" name="error" />
   </div>
 </template>

@@ -45,6 +45,22 @@ describe('StreamMarkdown', () => {
     expect(wrapper.text()).toContain('partial answer')
   })
 
+  it('does not recreate DOM nodes of settled blocks when the tail grows', async () => {
+    const t1 = '# Title\n\nFirst paragraph stays.\n\nSecond para'
+    const wrapper = mount(StreamMarkdown, { props: { text: t1, status: 'streaming' } })
+    await vi.waitFor(() => expect(wrapper.html()).toContain('<h1>'))
+
+    const before = wrapper.element.querySelector('h1')!
+    const beforeP = wrapper.element.querySelector('p')!
+    await wrapper.setProps({ text: t1 + 'graph grows.\n\nBrand-new paragraph' })
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Brand-new'))
+
+    // the settled heading and first paragraph must be the SAME nodes —
+    // full-subtree replacement is the flicker this component must not have
+    expect(wrapper.element.querySelector('h1')).toBe(before)
+    expect(wrapper.element.querySelector('p')).toBe(beforeP)
+  })
+
   it('escapes hostile markdown', async () => {
     const wrapper = mount(StreamMarkdown, {
       props: { text: '<img src=x onerror=alert(1)>', status: 'done' },

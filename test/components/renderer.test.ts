@@ -60,6 +60,35 @@ describe('createMarkdownRenderer', () => {
     expect((html.match(/<pre/g) ?? []).length).toBe(1)
   })
 
+  it('splits output into top-level blocks whose concatenation equals html', () => {
+    const { html, blocks } = render('# Title\n\nParagraph one.\n\n- a\n- b\n\n```js\nx\n```\n')
+    expect(blocks.length).toBe(4) // heading, paragraph, list, fence
+    expect(blocks.join('')).toBe(html)
+  })
+
+  it('keeps earlier block strings byte-identical as the text grows (stable prefix)', () => {
+    const t1 = '# Title\n\nFirst paragraph.\n\n```js\nconst a = 1\n```\n\nSecond para'
+    const t2 = t1 + 'graph grows.\n\nAnd a brand-new paragraph'
+    const r1 = render(t1)
+    const r2 = render(t2)
+    // everything before the block that changed must be reusable as-is
+    expect(r2.blocks[0]).toBe(r1.blocks[0])
+    expect(r2.blocks[1]).toBe(r1.blocks[1])
+    expect(r2.blocks[2]).toBe(r1.blocks[2])
+    expect(r2.blocks.length).toBe(r1.blocks.length + 1)
+  })
+
+  it('open fence stays correctly marked when rendered as a block', () => {
+    const calls: Array<[string, boolean]> = []
+    const render2 = createMarkdownRenderer((code, _lang, isOpen) => {
+      calls.push([code, isOpen])
+      return null
+    })
+    const { blocks } = render2('done text\n\n```js\nstreaming')
+    expect(blocks.length).toBe(2)
+    expect(calls).toEqual([['streaming\n', true]])
+  })
+
   it('marks the real fence open when auto-closing inside a list item — no phantom fence', () => {
     const calls: Array<[string, string, boolean]> = []
     const render2 = createMarkdownRenderer((code, lang, isOpen) => {
