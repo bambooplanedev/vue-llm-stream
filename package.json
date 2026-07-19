@@ -29,14 +29,17 @@
     "./markdown": {
       "types": "./dist/markdown.d.ts",
       "import": "./dist/markdown.js"
-    }
+    },
+    "./theme.css": "./dist/theme.css"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-vue-dts.mjs",
-    "check:package": "publint && attw --pack . --profile esm-only",
+    "build": "vite build && vue-tsc -p tsconfig.build.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-vue-dts.mjs && node -e \"require('node:fs').copyFileSync('src/theme.css', 'dist/theme.css')\"",
+    "check:package": "publint && attw --pack . --profile esm-only --exclude-entrypoints ./theme.css",
     "prepublishOnly": "npm run build && npm run check:package",
     "play": "vite --config playground/vite.config.ts playground",
     "play:build": "vite build --config playground/vite.config.ts playground"
@@ -67,6 +70,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@types/markdown-it": "^14.0.0",
+    "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.4.0",
     "happy-dom": "^20.11.0",

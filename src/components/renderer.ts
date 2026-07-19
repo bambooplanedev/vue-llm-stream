@@ -5,8 +5,11 @@ export interface RenderResult {
   html: string
   /**
    * HTML of each top-level block, in order; `blocks.join('') === html`.
-   * During streaming only the tail block changes, so earlier entries stay
-   * byte-identical between frames and their DOM can be left untouched.
+   * During streaming, settled entries almost always stay byte-identical
+   * between frames so their DOM can be left untouched. The exception is
+   * document-wide context arriving late (e.g. a reference-link definition
+   * that resolves a link used blocks earlier) — the affected entry changes
+   * and must be re-applied, which per-block diffing handles naturally.
    */
   blocks: string[]
   /** Token index of the still-streaming (auto-closed) fence, or null. */

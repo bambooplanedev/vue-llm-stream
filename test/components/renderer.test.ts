@@ -78,6 +78,15 @@ describe('createMarkdownRenderer', () => {
     expect(r2.blocks.length).toBe(r1.blocks.length + 1)
   })
 
+  it('re-renders an earlier block when a late reference definition resolves its link', () => {
+    const usage = 'See [the docs][ref] here.\n\nNext paragraph'
+    const r1 = render(usage)
+    const r2 = render(usage + '.\n\n[ref]: https://example.com')
+    // correctness beats stability: the settled block must pick up the link
+    expect(r1.blocks[0]).not.toContain('href')
+    expect(r2.blocks[0]).toContain('href="https://example.com"')
+  })
+
   it('open fence stays correctly marked when rendered as a block', () => {
     const calls: Array<[string, boolean]> = []
     const render2 = createMarkdownRenderer((code, _lang, isOpen) => {

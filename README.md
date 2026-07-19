@@ -41,6 +41,7 @@ Piping an SSE response straight into innerHTML and re-parsing the whole thing on
   - [Mock](#mock)
   - [Writing a custom adapter](#writing-a-custom-adapter)
 - [API reference](#api-reference)
+- [Theming](#theming)
 - [Streaming markdown: how stabilization works](#streaming-markdown-how-stabilization-works)
 - [Error handling & retries](#error-handling--retries)
 - [Recipes](#recipes)
@@ -213,6 +214,49 @@ When rendering a live stream, always pass `status` — the `'done'`/`'error'` tr
 | --- | --- | --- |
 | `isPinned` | `Ref<boolean>` | `true` while auto-scroll is active. |
 | `scrollToBottom` | `() => void` | Scrolls to the bottom and re-pins. |
+
+## Theming
+
+`<StreamMarkdown>` ships unstyled by default. The default theme is an opt-in stylesheet:
+
+```ts
+import 'vue-llm-stream/theme.css'
+```
+
+It styles everything the renderer can emit — headings, lists, tables, blockquotes, inline code, and code blocks — and follows the system color scheme. Force a scheme with a class on the component or any ancestor:
+
+```html
+<StreamMarkdown class="vls-dark" :text="text" :status="status" />
+```
+
+If the component sits on a surface with a fixed background (a light chat bubble, say), force the matching scheme — otherwise a dark-mode OS gets light text on your light surface.
+
+Every visual decision is a CSS custom property, so a custom theme is a stylesheet that re-declares variables — no JavaScript involved:
+
+```css
+/* my-theme.css — loaded after vue-llm-stream/theme.css */
+.vls-stream-markdown {
+  --vls-link: #7c3aed;
+  --vls-code-bg: #16161e;
+  --vls-radius: 12px;
+  --vls-mono: 'JetBrains Mono', monospace;
+}
+```
+
+| Variable | Controls |
+| --- | --- |
+| `--vls-fg` / `--vls-muted` | Body and secondary text color. |
+| `--vls-link` | Link color. |
+| `--vls-border` | Table and rule borders. |
+| `--vls-code-bg` / `--vls-code-fg` | Code-block background and text (pre-highlight and plain fallback; Shiki paints its own colors once loaded). |
+| `--vls-inline-code-bg` | Inline `code` chip background. |
+| `--vls-blockquote-border` | Blockquote accent. |
+| `--vls-table-header-bg` | Table header background. |
+| `--vls-radius` | Code-block corner radius. |
+| `--vls-font` / `--vls-mono` / `--vls-font-size` / `--vls-line-height` | Typography. |
+| `--vls-block-gap` | Vertical rhythm between blocks. |
+
+The code inside fences is colored by Shiki, configured separately via the `highlight` prop (`:highlight="{ theme: 'vitesse-dark' }"`) — pick a Shiki theme that matches your CSS theme. All selectors are scoped under `.vls-` classes, so importing the theme never restyles the host app.
 
 ## Streaming markdown: how stabilization works
 

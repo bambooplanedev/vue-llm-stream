@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import 'vue-llm-stream/theme.css'
 import { useLlmStream, useScrollAnchor, type ChatMessage } from 'vue-llm-stream'
 import { anthropic, mock, openaiCompatible } from 'vue-llm-stream/providers'
 import { StreamMarkdown } from 'vue-llm-stream/markdown'
@@ -59,7 +60,8 @@ function onComposerKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <main class="page">
+  <!-- chat bubbles are light surfaces — force the light theme regardless of OS scheme -->
+  <main class="page vls-light">
     <header class="bar">
       <strong>vue-llm-stream</strong>
       <select v-model="preset">
@@ -118,5 +120,4 @@ function onComposerKeydown(e: KeyboardEvent) {
 .composer input { flex: 1; padding: 10px; }
 .to-bottom { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); }
 .error-row { display: flex; gap: 8px; align-items: center; color: #b00020; }
-pre { overflow-x: auto; border-radius: 8px; padding: 12px; }
 </style>

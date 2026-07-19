@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
+      'vue-llm-stream/theme.css': fileURLToPath(new URL('../src/theme.css', import.meta.url)),
       'vue-llm-stream/providers': fileURLToPath(new URL('../src/providers.ts', import.meta.url)),
       'vue-llm-stream/markdown': fileURLToPath(new URL('../src/markdown.ts', import.meta.url)),
       'vue-llm-stream': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
