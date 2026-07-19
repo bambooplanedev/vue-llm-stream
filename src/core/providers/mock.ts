@@ -45,7 +45,7 @@ export function mock(config: MockConfig): LlmProvider {
         return new Response(JSON.stringify({ error: { message: 'mock http failure' } }), { status: failure.status })
       }
       const enc = new TextEncoder()
-      const signal = init?.signal
+      const signal = init?.signal ?? undefined
       const stream = new ReadableStream<Uint8Array>({
         async start(c) {
           let i = 0
