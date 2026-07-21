@@ -72,3 +72,23 @@ describe('mock provider', () => {
     expect(events).toEqual([])
   })
 })
+
+describe('mock provider — tool-call script', () => {
+  it('streams text then a chunked tool-call and finishes with tool_use', async () => {
+    const provider = mock({
+      tokensPerSec: 10_000,
+      script: [
+        { type: 'text', text: 'Let me check.' },
+        { type: 'tool-call', id: 'call_1', name: 'get_weather', args: { city: 'Kyiv' }, chunkArgs: 3 },
+      ],
+    })
+    const events = await run(provider)
+    const text = events.filter((e) => e.type === 'text-delta').map((e) => (e as any).text).join('')
+    expect(text).toBe('Let me check.')
+    expect(events).toContainEqual({ type: 'tool-call-start', index: 0, id: 'call_1', name: 'get_weather' })
+    const argsText = events.filter((e) => e.type === 'tool-call-delta').map((e) => (e as any).argsDelta).join('')
+    expect(argsText).toBe('{"city":"Kyiv"}')
+    expect(events).toContainEqual({ type: 'tool-call-end', index: 0 })
+    expect(events.at(-1)).toEqual({ type: 'done', finishReason: 'tool_use' })
+  })
+})
