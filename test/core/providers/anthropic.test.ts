@@ -63,3 +63,38 @@ describe('anthropic parser', () => {
       .toEqual([{ type: 'done', usage: { inputTokens: undefined, outputTokens: 1 }, finishReason: 'stop' }])
   })
 })
+
+describe('anthropic parser — tool calls', () => {
+  it('emits start/delta/end for a tool_use block and maps stop_reason tool_use', () => {
+    const parse = provider.createEventParser()
+    expect(parse({ event: 'content_block_start', data: '{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"get_weather"}}' }))
+      .toEqual([{ type: 'tool-call-start', index: 1, id: 'toolu_1', name: 'get_weather' }])
+    expect(parse({ event: 'content_block_delta', data: '{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"city\\":"}}' }))
+      .toEqual([{ type: 'tool-call-delta', index: 1, argsDelta: '{"city":' }])
+    expect(parse({ event: 'content_block_delta', data: '{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\\"Kyiv\\"}"}}' }))
+      .toEqual([{ type: 'tool-call-delta', index: 1, argsDelta: '"Kyiv"}' }])
+    expect(parse({ event: 'content_block_stop', data: '{"type":"content_block_stop","index":1}' }))
+      .toEqual([{ type: 'tool-call-end', index: 1 }])
+    parse({ event: 'message_delta', data: '{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":5}}' })
+    expect(parse({ event: 'message_stop', data: '{"type":"message_stop"}' }))
+      .toEqual([{ type: 'done', usage: { inputTokens: undefined, outputTokens: 5 }, finishReason: 'tool_use' }])
+  })
+
+  it('does not emit tool-call-end for a non-tool content_block_stop', () => {
+    const parse = provider.createEventParser()
+    expect(parse({ event: 'content_block_stop', data: '{"type":"content_block_stop","index":0}' })).toEqual([])
+  })
+
+  it('handles interleaved text and two concurrent tool blocks', () => {
+    const parse = provider.createEventParser()
+    parse({ event: 'content_block_start', data: '{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}' })
+    expect(parse({ event: 'content_block_delta', data: '{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}' }))
+      .toEqual([{ type: 'text-delta', text: 'Hi' }])
+    expect(parse({ event: 'content_block_start', data: '{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"a","name":"x"}}' }))
+      .toEqual([{ type: 'tool-call-start', index: 1, id: 'a', name: 'x' }])
+    expect(parse({ event: 'content_block_start', data: '{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"b","name":"y"}}' }))
+      .toEqual([{ type: 'tool-call-start', index: 2, id: 'b', name: 'y' }])
+    expect(parse({ event: 'content_block_stop', data: '{"type":"content_block_stop","index":1}' })).toEqual([{ type: 'tool-call-end', index: 1 }])
+    expect(parse({ event: 'content_block_stop', data: '{"type":"content_block_stop","index":2}' })).toEqual([{ type: 'tool-call-end', index: 2 }])
+  })
+})

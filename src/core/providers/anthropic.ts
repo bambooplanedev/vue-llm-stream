@@ -33,6 +33,7 @@ export function anthropic(config: AnthropicConfig): LlmProvider {
     createEventParser() {
       const usage: Usage = {}
       let finishReason: FinishReason = 'unknown'
+      const toolIndices = new Set<number>()
       return (frame) => {
         if (!frame.data) return [] // event-only heartbeat frames carry no JSON
         const json = JSON.parse(frame.data)
@@ -40,14 +41,27 @@ export function anthropic(config: AnthropicConfig): LlmProvider {
           case 'message_start':
             usage.inputTokens = json.message?.usage?.input_tokens
             return []
+          case 'content_block_start':
+            if (json.content_block?.type === 'tool_use') {
+              toolIndices.add(json.index)
+              return [{ type: 'tool-call-start', index: json.index, id: json.content_block.id, name: json.content_block.name }]
+            }
+            return []
           case 'content_block_delta':
             if (json.delta?.type === 'text_delta') return [{ type: 'text-delta', text: json.delta.text }]
             if (json.delta?.type === 'thinking_delta') return [{ type: 'reasoning-delta', text: json.delta.thinking }]
-            return [] // input_json_delta and future delta types: never rendered as text
+            if (json.delta?.type === 'input_json_delta' && toolIndices.has(json.index)) return [{ type: 'tool-call-delta', index: json.index, argsDelta: json.delta.partial_json }]
+            return []
+          case 'content_block_stop':
+            return toolIndices.has(json.index) ? [{ type: 'tool-call-end', index: json.index }] : []
           case 'message_delta':
             if (json.usage?.output_tokens !== undefined) usage.outputTokens = json.usage.output_tokens
             if (json.delta?.stop_reason) {
-              finishReason = json.delta.stop_reason === 'max_tokens' ? 'max_tokens' : 'stop'
+              finishReason = json.delta.stop_reason === 'max_tokens'
+                ? 'max_tokens'
+                : json.delta.stop_reason === 'tool_use'
+                  ? 'tool_use'
+                  : 'stop'
             }
             return []
           case 'message_stop':
@@ -55,7 +69,7 @@ export function anthropic(config: AnthropicConfig): LlmProvider {
           case 'error':
             return [{ type: 'error', error: { code: json.error?.type, message: json.error?.message ?? 'provider error' } }]
           default:
-            return [] // ping, content_block_start, content_block_stop, unknown future events
+            return [] // ping, unknown future events
         }
       }
     },
