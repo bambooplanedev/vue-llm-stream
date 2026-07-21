@@ -67,3 +67,35 @@ describe('openaiCompatible parser', () => {
     expect(events).toEqual([{ type: 'error', error: { message: 'quota exceeded' } }])
   })
 })
+
+describe('openai-compatible parser — tool calls', () => {
+  const p = openaiCompatible({ model: 'gpt-4o-mini' })
+  it('emits start, arg deltas, and end on finish_reason tool_calls', () => {
+    const parse = p.createEventParser()
+    expect(parse({ data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"get_weather","arguments":""}}]}}]}' }))
+      .toEqual([{ type: 'tool-call-start', index: 0, id: 'call_1', name: 'get_weather' }])
+    expect(parse({ data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"city\\":"}}]}}]}' }))
+      .toEqual([{ type: 'tool-call-delta', index: 0, argsDelta: '{"city":' }])
+    expect(parse({ data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\\"Kyiv\\"}"}}]}}]}' }))
+      .toEqual([{ type: 'tool-call-delta', index: 0, argsDelta: '"Kyiv"}' }])
+    expect(parse({ data: '{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}' }))
+      .toEqual([{ type: 'tool-call-end', index: 0 }])
+    expect(parse({ data: '[DONE]' })).toEqual([{ type: 'done', usage: undefined, finishReason: 'tool_use' }])
+  })
+
+  it('flushes open tool calls at [DONE] when finish_reason was absent', () => {
+    const parse = p.createEventParser()
+    parse({ data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c","function":{"name":"n","arguments":"{}"}}]}}]}' })
+    expect(parse({ data: '[DONE]' }))
+      .toEqual([{ type: 'tool-call-end', index: 0 }, { type: 'done', usage: undefined, finishReason: 'unknown' }])
+  })
+
+  it('handles two concurrent tool calls in one frame', () => {
+    const parse = p.createEventParser()
+    expect(parse({ data: '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c0","function":{"name":"a","arguments":""}},{"index":1,"id":"c1","function":{"name":"b","arguments":""}}]}}]}' }))
+      .toEqual([
+        { type: 'tool-call-start', index: 0, id: 'c0', name: 'a' },
+        { type: 'tool-call-start', index: 1, id: 'c1', name: 'b' },
+      ])
+  })
+})

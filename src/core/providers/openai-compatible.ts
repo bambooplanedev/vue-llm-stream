@@ -1,4 +1,4 @@
-import type { FinishReason, LlmProvider, Usage } from '../events.js'
+import type { FinishReason, LlmProvider, StreamEvent, Usage } from '../events.js'
 
 export interface OpenAiCompatibleConfig {
   apiKey?: string
@@ -27,31 +27,53 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
     createEventParser() {
       let usage: Usage | undefined
       let finishReason: FinishReason = 'unknown'
-      return (frame) => {
+      const openTools = new Set<number>()
+      return (frame): StreamEvent[] => {
         if (!frame.data) return [] // event-only heartbeat frames carry no JSON
-        if (frame.data === '[DONE]') return [{ type: 'done', usage, finishReason }]
+        if (frame.data === '[DONE]') {
+          const ends: StreamEvent[] = [...openTools].map((index) => ({ type: 'tool-call-end', index }))
+          openTools.clear()
+          return [...ends, { type: 'done', usage, finishReason }]
+        }
         const json = JSON.parse(frame.data)
-        // OpenRouter, Azure, vLLM and other proxies report failures as a data
-        // frame with a top-level error object, then close without [DONE] —
-        // surface it instead of letting the stream EOF as a generic incomplete
         if (json.error) {
           const err = json.error
           return [{
             type: 'error',
-            error: typeof err === 'string'
-              ? { message: err }
-              : { code: err.code ?? err.type, message: err.message ?? 'provider error' },
+            error: typeof err === 'string' ? { message: err } : { code: err.code ?? err.type, message: err.message ?? 'provider error' },
           }]
         }
         if (json.usage) {
           usage = { inputTokens: json.usage.prompt_tokens, outputTokens: json.usage.completion_tokens }
         }
+        const events: StreamEvent[] = []
         const choice = json.choices?.[0]
+        if (Array.isArray(choice?.delta?.tool_calls)) {
+          for (const tc of choice.delta.tool_calls) {
+            if (typeof tc.index !== 'number') continue
+            if (!openTools.has(tc.index) && (tc.id || tc.function?.name)) {
+              openTools.add(tc.index)
+              events.push({ type: 'tool-call-start', index: tc.index, id: tc.id ?? '', name: tc.function?.name ?? '' })
+            }
+            if (typeof tc.function?.arguments === 'string' && tc.function.arguments.length > 0) {
+              events.push({ type: 'tool-call-delta', index: tc.index, argsDelta: tc.function.arguments })
+            }
+          }
+        }
         if (choice?.finish_reason) {
-          finishReason = choice.finish_reason === 'length' ? 'max_tokens' : 'stop'
+          finishReason = choice.finish_reason === 'length'
+            ? 'max_tokens'
+            : choice.finish_reason === 'tool_calls'
+              ? 'tool_use'
+              : 'stop'
+          if (choice.finish_reason === 'tool_calls') {
+            for (const index of openTools) events.push({ type: 'tool-call-end', index })
+            openTools.clear()
+          }
         }
         const text = choice?.delta?.content
-        return typeof text === 'string' && text.length > 0 ? [{ type: 'text-delta', text }] : []
+        if (typeof text === 'string' && text.length > 0) events.push({ type: 'text-delta', text })
+        return events
       }
     },
   }
