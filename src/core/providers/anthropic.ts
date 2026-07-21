@@ -12,23 +12,37 @@ export function anthropic(config: AnthropicConfig): LlmProvider {
   return {
     buildRequest({ messages, tools }) {
       const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
-      const apiMessages = messages
-        .filter((m) => m.role !== 'system')
-        .map((m) => {
-          if (m.role === 'tool') {
-            return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.toolCallId, content: m.content }] }
+      // Anthropic requires every tool_result for a turn to live in ONE user message
+      // and roles to strictly alternate — consecutive `tool` messages (parallel
+      // tool calls resolved in sequence) are coalesced into a single user turn,
+      // one tool_result block per message, rather than one user message each.
+      const apiMessages: Record<string, unknown>[] = []
+      let openToolResultBlocks: Record<string, unknown>[] | null = null
+      for (const m of messages) {
+        if (m.role === 'system') continue
+        if (m.role === 'tool') {
+          const block = { type: 'tool_result', tool_use_id: m.toolCallId, content: m.content }
+          if (openToolResultBlocks) {
+            openToolResultBlocks.push(block)
+          } else {
+            openToolResultBlocks = [block]
+            apiMessages.push({ role: 'user', content: openToolResultBlocks })
           }
-          if (m.role === 'assistant' && m.toolCalls?.length) {
-            return {
-              role: 'assistant',
-              content: [
-                ...(m.content ? [{ type: 'text', text: m.content }] : []),
-                ...m.toolCalls.map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.args })),
-              ],
-            }
-          }
-          return { role: m.role, content: m.content }
-        })
+          continue
+        }
+        openToolResultBlocks = null
+        if (m.role === 'assistant' && m.toolCalls?.length) {
+          apiMessages.push({
+            role: 'assistant',
+            content: [
+              ...(m.content ? [{ type: 'text', text: m.content }] : []),
+              ...m.toolCalls.map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.args ?? {} })),
+            ],
+          })
+          continue
+        }
+        apiMessages.push({ role: m.role, content: m.content })
+      }
       return {
         body: {
           model: config.model,

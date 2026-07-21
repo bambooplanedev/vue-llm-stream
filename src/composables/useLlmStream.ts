@@ -31,6 +31,9 @@ export interface UseLlmStreamOptions {
   retry?: RetryOptions | false
   abortOnUnmount?: boolean
   tools?: MaybeRefOrGetter<ToolDef[] | undefined>
+  /** Raw tap: fires BEFORE `text`/`toolCalls`/etc. are updated for this event, so a
+   *  handler reading e.g. `toolCalls.value` during a `tool-call-end` still sees the
+   *  pre-parse state (args not yet parsed onto the matching entry). */
   onEvent?: (ev: StreamEvent) => void
   onDelta?: (text: string) => void
   onDone?: (text: string) => void

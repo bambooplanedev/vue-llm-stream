@@ -124,4 +124,39 @@ describe('anthropic.buildRequest — tools', () => {
     expect(body.tools).toBeUndefined()
     expect(body.messages).toEqual([{ role: 'user', content: 'hi' }])
   })
+
+  it('coalesces consecutive tool-result messages from parallel tool calls into a single user turn', () => {
+    const { body } = provider.buildRequest({
+      messages: [
+        { role: 'user', content: 'weather in two cities?' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            { id: 't1', name: 'get_weather', args: { city: 'Kyiv' } },
+            { id: 't2', name: 'get_weather', args: { city: 'Lviv' } },
+          ],
+        },
+        { role: 'tool', toolCallId: 't1', content: '17C' },
+        { role: 'tool', toolCallId: 't2', content: '15C' },
+      ],
+    })
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'weather in two cities?' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 't1', name: 'get_weather', input: { city: 'Kyiv' } },
+          { type: 'tool_use', id: 't2', name: 'get_weather', input: { city: 'Lviv' } },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 't1', content: '17C' },
+          { type: 'tool_result', tool_use_id: 't2', content: '15C' },
+        ],
+      },
+    ])
+  })
 })

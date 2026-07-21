@@ -17,7 +17,7 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
           return {
             role: 'assistant',
             content: m.content || null,
-            tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })),
+            tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) } })),
           }
         }
         return m
@@ -48,6 +48,10 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
           return [...ends, { type: 'done', usage, finishReason }]
         }
         const json = JSON.parse(frame.data)
+        // OpenRouter, Azure, vLLM and other proxies report mid-stream failures as a
+        // data frame with a top-level `error` object and then close the stream
+        // without ever sending [DONE] — surface it as an error event here rather
+        // than letting it fall through to an EOF-without-done "incomplete" state.
         if (json.error) {
           const err = json.error
           return [{
@@ -63,6 +67,9 @@ export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
         if (Array.isArray(choice?.delta?.tool_calls)) {
           for (const tc of choice.delta.tool_calls) {
             if (typeof tc.index !== 'number') continue
+            // Assumes the first fragment for a given index carries both `id` and
+            // `name` (true for OpenAI-compatible servers); `id` is never back-filled
+            // from a later fragment if it's missing here.
             if (!openTools.has(tc.index) && (tc.id || tc.function?.name)) {
               openTools.add(tc.index)
               events.push({ type: 'tool-call-start', index: tc.index, id: tc.id ?? '', name: tc.function?.name ?? '' })
