@@ -68,6 +68,28 @@ describe('openaiCompatible parser', () => {
   })
 })
 
+describe('openai-compatible.buildRequest — tools', () => {
+  it('serializes tool defs and tool call/result messages to OpenAI wire format', () => {
+    const p = openaiCompatible({ apiKey: 'sk', model: 'gpt-4o' })
+    const { body } = p.buildRequest({
+      messages: [
+        { role: 'user', content: 'weather?' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'get_weather', args: { city: 'Kyiv' } }] },
+        { role: 'tool', toolCallId: 'call_1', content: '17C' },
+      ],
+      tools: [{ name: 'get_weather', parameters: { type: 'object' } }],
+    })
+    expect(body.tools).toEqual([
+      { type: 'function', function: { name: 'get_weather', description: undefined, parameters: { type: 'object' } } },
+    ])
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'weather?' },
+      { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Kyiv"}' } }] },
+      { role: 'tool', tool_call_id: 'call_1', content: '17C' },
+    ])
+  })
+})
+
 describe('openai-compatible parser — tool calls', () => {
   const p = openaiCompatible({ model: 'gpt-4o-mini' })
   it('emits start, arg deltas, and end on finish_reason tool_calls', () => {

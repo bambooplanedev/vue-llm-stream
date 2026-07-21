@@ -10,12 +10,24 @@ export interface OpenAiCompatibleConfig {
 
 export function openaiCompatible(config: OpenAiCompatibleConfig): LlmProvider {
   return {
-    buildRequest({ messages }) {
+    buildRequest({ messages, tools }) {
+      const apiMessages = messages.map((m) => {
+        if (m.role === 'tool') return { role: 'tool', tool_call_id: m.toolCallId, content: m.content }
+        if (m.role === 'assistant' && m.toolCalls?.length) {
+          return {
+            role: 'assistant',
+            content: m.content || null,
+            tool_calls: m.toolCalls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })),
+          }
+        }
+        return m
+      })
       return {
         body: {
           model: config.model,
-          messages,
+          messages: apiMessages,
           stream: true,
+          ...(tools?.length ? { tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })) } : {}),
           ...(config.includeUsage !== false ? { stream_options: { include_usage: true } } : {}),
         },
         headers: {
