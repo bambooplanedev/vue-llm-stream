@@ -1,5 +1,5 @@
 export { useLlmStream } from './composables/useLlmStream.js'
-export type { LlmStreamStatus, PerCallOptions, UseLlmStreamOptions, UseLlmStreamReturn } from './composables/useLlmStream.js'
+export type { LlmStreamStatus, PerCallOptions, ToolCallState, UseLlmStreamOptions, UseLlmStreamReturn } from './composables/useLlmStream.js'
 export { useScrollAnchor } from './composables/useScrollAnchor.js'
 export type { ScrollAnchorOptions } from './composables/useScrollAnchor.js'
 export type {

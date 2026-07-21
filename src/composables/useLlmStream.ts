@@ -2,11 +2,20 @@ import {
   computed, getCurrentScope, onScopeDispose, ref, shallowRef, toValue,
   type ComputedRef, type MaybeRefOrGetter, type Ref,
 } from 'vue'
-import type { ChatMessage, FinishReason, LlmProvider, LlmStreamError, Usage } from '../core/events.js'
+import type { ChatMessage, FinishReason, LlmProvider, LlmStreamError, StreamEvent, ToolDef, Usage } from '../core/events.js'
 import { isRetryable, retryDelayMs, type RetryOptions } from '../core/retry.js'
 import { streamRequest } from '../core/stream.js'
 
 export type LlmStreamStatus = 'idle' | 'submitted' | 'streaming' | 'done' | 'error'
+
+export interface ToolCallState {
+  index: number
+  id: string
+  name: string
+  argsText: string
+  args?: unknown
+  state: 'streaming' | 'complete'
+}
 
 export interface PerCallOptions {
   headers?: Record<string, string>
@@ -21,6 +30,8 @@ export interface UseLlmStreamOptions {
   fetch?: typeof globalThis.fetch
   retry?: RetryOptions | false
   abortOnUnmount?: boolean
+  tools?: MaybeRefOrGetter<ToolDef[] | undefined>
+  onEvent?: (ev: StreamEvent) => void
   onDelta?: (text: string) => void
   onDone?: (text: string) => void
   onError?: (error: LlmStreamError) => void
@@ -45,6 +56,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<boolean> {
 export interface UseLlmStreamReturn {
   text: Ref<string>
   reasoning: Ref<string>
+  toolCalls: Ref<ToolCallState[]>
   status: Ref<LlmStreamStatus>
   isStreaming: ComputedRef<boolean>
   finishReason: Ref<FinishReason | null>
@@ -59,6 +71,7 @@ export interface UseLlmStreamReturn {
 export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
   const text = ref('')
   const reasoning = ref('')
+  const toolCalls = ref<ToolCallState[]>([])
   const status = ref<LlmStreamStatus>('idle')
   const error = shallowRef<LlmStreamError | null>(null)
   const usage = shallowRef<Usage | null>(null)
@@ -93,6 +106,7 @@ export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
 
     text.value = ''
     reasoning.value = ''
+    toolCalls.value = []
     error.value = null
     usage.value = null
     finishReason.value = null
@@ -118,7 +132,7 @@ export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
       // transient network failure — surface it without burning the retry budget
       let req: ReturnType<LlmProvider['buildRequest']>
       try {
-        req = provider.buildRequest({ messages })
+        req = provider.buildRequest({ messages, tools: toValue(options.tools) })
       } catch (e) {
         const err: LlmStreamError = {
           kind: 'provider',
@@ -139,6 +153,7 @@ export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
           fetchImpl: provider.fetch ?? options.fetch,
         })) {
           if (gen !== generation) return undefined
+          options.onEvent?.(ev)
           switch (ev.type) {
             case 'text-delta':
               sawToken = true
@@ -151,6 +166,24 @@ export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
               status.value = 'streaming'
               reasoning.value += ev.text
               break
+            case 'tool-call-start':
+              sawToken = true
+              status.value = 'streaming'
+              toolCalls.value.push({ index: ev.index, id: ev.id, name: ev.name, argsText: '', state: 'streaming' })
+              break
+            case 'tool-call-delta': {
+              const tc = toolCalls.value.find((t) => t.index === ev.index)
+              if (tc) tc.argsText += ev.argsDelta
+              break
+            }
+            case 'tool-call-end': {
+              const tc = toolCalls.value.find((t) => t.index === ev.index)
+              if (tc) {
+                tc.state = 'complete'
+                try { tc.args = JSON.parse(tc.argsText) } catch { /* incomplete/invalid JSON: keep argsText, leave args undefined */ }
+              }
+              break
+            }
             case 'done':
               usage.value = ev.usage ?? null
               finishReason.value = ev.finishReason ?? 'unknown'
@@ -193,7 +226,7 @@ export function useLlmStream(options: UseLlmStreamOptions): UseLlmStreamReturn {
   }
 
   return {
-    text, reasoning, status, isStreaming, finishReason, error, usage, retryCount,
+    text, reasoning, toolCalls, status, isStreaming, finishReason, error, usage, retryCount,
     start, abort, regenerate,
   }
 }

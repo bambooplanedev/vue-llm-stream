@@ -165,3 +165,28 @@ describe('useLlmStream', () => {
     expect(seen).toEqual(['mock://a', 'mock://b'])
   })
 })
+
+describe('useLlmStream — tool calls', () => {
+  it('accumulates tool calls into the toolCalls ref and fires onEvent for every event', async () => {
+    const seen: string[] = []
+    const provider = mock({
+      tokensPerSec: 10_000,
+      script: [
+        { type: 'text', text: 'hi' },
+        { type: 'tool-call', id: 'call_1', name: 'calc', args: { a: 2, b: 3 }, chunkArgs: 4 },
+      ],
+    })
+    const chat = useLlmStream({ url: 'mock://', provider, onEvent: (ev) => seen.push(ev.type) })
+    await chat.start('go')
+    expect(chat.toolCalls.value).toHaveLength(1)
+    expect(chat.toolCalls.value[0]).toMatchObject({ id: 'call_1', name: 'calc', state: 'complete', args: { a: 2, b: 3 } })
+    expect(seen).toEqual(expect.arrayContaining(['tool-call-start', 'tool-call-delta', 'tool-call-end', 'done']))
+  })
+
+  it('leaves toolCalls empty for a text-only stream', async () => {
+    const chat = useLlmStream({ url: 'mock://', provider: mock({ text: 'just text', tokensPerSec: 10_000 }) })
+    await chat.start('go')
+    expect(chat.text.value).toBe('just text')
+    expect(chat.toolCalls.value).toEqual([])
+  })
+})
