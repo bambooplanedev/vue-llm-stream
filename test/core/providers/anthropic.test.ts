@@ -98,3 +98,30 @@ describe('anthropic parser — tool calls', () => {
     expect(parse({ event: 'content_block_stop', data: '{"type":"content_block_stop","index":2}' })).toEqual([{ type: 'tool-call-end', index: 2 }])
   })
 })
+
+describe('anthropic.buildRequest — tools', () => {
+  it('serializes tool defs to input_schema and echoes tool calls/results as content blocks', () => {
+    const { body } = provider.buildRequest({
+      messages: [
+        { role: 'user', content: 'weather?' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'toolu_1', name: 'get_weather', args: { city: 'Kyiv' } }] },
+        { role: 'tool', toolCallId: 'toolu_1', content: '17C' },
+      ],
+      tools: [{ name: 'get_weather', description: 'Get weather', parameters: { type: 'object', properties: { city: { type: 'string' } } } }],
+    })
+    expect(body.tools).toEqual([
+      { name: 'get_weather', description: 'Get weather', input_schema: { type: 'object', properties: { city: { type: 'string' } } } },
+    ])
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'weather?' },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'get_weather', input: { city: 'Kyiv' } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '17C' }] },
+    ])
+  })
+
+  it('omits tools when none are passed and preserves plain string messages', () => {
+    const { body } = provider.buildRequest({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(body.tools).toBeUndefined()
+    expect(body.messages).toEqual([{ role: 'user', content: 'hi' }])
+  })
+})

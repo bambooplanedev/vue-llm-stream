@@ -10,14 +10,32 @@ export interface AnthropicConfig {
 
 export function anthropic(config: AnthropicConfig): LlmProvider {
   return {
-    buildRequest({ messages }) {
+    buildRequest({ messages, tools }) {
       const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
+      const apiMessages = messages
+        .filter((m) => m.role !== 'system')
+        .map((m) => {
+          if (m.role === 'tool') {
+            return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.toolCallId, content: m.content }] }
+          }
+          if (m.role === 'assistant' && m.toolCalls?.length) {
+            return {
+              role: 'assistant',
+              content: [
+                ...(m.content ? [{ type: 'text', text: m.content }] : []),
+                ...m.toolCalls.map((c) => ({ type: 'tool_use', id: c.id, name: c.name, input: c.args })),
+              ],
+            }
+          }
+          return { role: m.role, content: m.content }
+        })
       return {
         body: {
           model: config.model,
           max_tokens: config.maxTokens,
           ...(system ? { system } : {}),
-          messages: messages.filter((m) => m.role !== 'system'),
+          messages: apiMessages,
+          ...(tools?.length ? { tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })) } : {}),
           stream: true,
         },
         headers: {
