@@ -3,6 +3,6 @@ export type { LlmStreamStatus, PerCallOptions, UseLlmStreamOptions, UseLlmStream
 export { useScrollAnchor } from './composables/useScrollAnchor.js'
 export type { ScrollAnchorOptions } from './composables/useScrollAnchor.js'
 export type {
-  ChatMessage, FinishReason, LlmProvider, LlmStreamError, SseFrame, StreamEvent, Usage,
+  ChatMessage, FinishReason, LlmProvider, LlmStreamError, SseFrame, StreamEvent, ToolCall, ToolDef, Usage,
 } from './core/events.js'
 export type { RetryOptions } from './core/retry.js'
