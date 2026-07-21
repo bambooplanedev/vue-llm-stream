@@ -1,6 +1,6 @@
 {
   "name": "vue-llm-stream",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Streaming LLM responses for Vue 3 — SSE parsing, resilient retries, and token-by-token markdown rendering with live syntax highlighting.",
   "type": "module",
   "license": "MIT",

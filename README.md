@@ -28,6 +28,7 @@ Piping an SSE response straight into innerHTML and re-parsing the whole thing on
 - Shiki highlighting inside still-open code blocks — loaded on demand only when highlighting is enabled, memoized per closed block, with light/dark dual themes that follow the color scheme.
 - Abort support plus pre-first-token auto-retry with exponential backoff and `Retry-After` handling.
 - `useScrollAnchor` — pins a chat log to the bottom while it grows, releases on user scroll.
+- Tool calls: adapters stream `tool-call-start`/`tool-call-delta`/`tool-call-end` events (partial-JSON arguments), accept a unified `ToolDef[]`, and round-trip tool results across turns. Executing the tool is the consumer's job.
 - Fully typed, ESM-only, zero runtime dependencies in the core.
 
 <details>
@@ -44,6 +45,7 @@ Piping an SSE response straight into innerHTML and re-parsing the whole thing on
 - [Theming](#theming)
 - [Streaming markdown: how stabilization works](#streaming-markdown-how-stabilization-works)
 - [Error handling & retries](#error-handling--retries)
+- [Tool calls](#tool-calls)
 - [Recipes](#recipes)
   - [Build a chat](#build-a-chat)
   - [Custom rendering](#custom-rendering)
@@ -299,6 +301,45 @@ The same pass balances unterminated `*`/`_`/`` ` `` runs and drops a table row t
 - A 429 or 5xx with a `Retry-After` header (seconds or HTTP-date) is honored up to a 10s clamp; anything longer is treated as non-retryable.
 - Without a server-provided delay, backoff is exponential from `retry.baseDelayMs` (default 500ms, equal jitter — each delay lands between 50% and 100% of the exponential step), for up to `retry.retries` retries after the initial request (default 2).
 - `regenerate()` restarts the whole call from scratch with the last input — it is not part of the retry loop and has its own fresh attempt budget.
+
+## Tool calls
+
+Pass tools as a provider-agnostic `ToolDef[]`; each adapter serializes them to its own wire format:
+
+```ts
+const { text, toolCalls, start } = useLlmStream({
+  url,
+  provider,
+  tools: [
+    { name: 'get_weather', description: 'Current weather for a city',
+      parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } },
+  ],
+  onEvent(ev) { /* raw stream events, incl. tool-call-start/delta/end */ },
+})
+```
+
+While a call streams, `toolCalls` accumulates:
+
+```ts
+interface ToolCallState {
+  index: number; id: string; name: string
+  argsText: string           // raw JSON so far (may be partial mid-stream)
+  args?: unknown             // parsed once the call ends
+  state: 'streaming' | 'complete'
+}
+```
+
+To continue after running a tool, append the assistant's call and your result, then start again:
+
+```ts
+await start([
+  { role: 'user', content: 'weather in Kyiv?' },
+  { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'get_weather', args: { city: 'Kyiv' } }] },
+  { role: 'tool', toolCallId: 'call_1', content: '17°C, clear' },
+])
+```
+
+The library streams and normalizes tool calls; **executing** the tool and feeding the result back is the consumer's responsibility.
 
 ## Recipes
 
