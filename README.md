@@ -2,8 +2,6 @@
 
 *Streaming LLM responses for Vue 3 — SSE parsing, resilient retries, and token-by-token markdown rendering with live syntax highlighting.*
 
-[![npm version](https://img.shields.io/npm/v/vue-llm-stream.svg)](https://www.npmjs.com/package/vue-llm-stream)
-[![bundle size](https://deno.bundlejs.com/badge?q=vue-llm-stream)](https://bundlejs.com/?q=vue-llm-stream)
 [![CI](https://github.com/bambooplanedev/vue-llm-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/bambooplanedev/vue-llm-stream/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/vue-llm-stream.svg)](LICENSE)
 
